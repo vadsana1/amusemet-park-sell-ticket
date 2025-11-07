@@ -1,136 +1,181 @@
 import 'package:flutter/material.dart';
-import '../models/ticket.dart'; 
-import '../models/payment_method.dart'; 
+import '../models/ticket.dart';
+import '../models/payment_method.dart';
+import '../models/cart_item.dart';
+import 'payment_page.dart';
+
+// 👈 1. [FIX] Import API จริง
+import '../services/payment_api.dart'; // (⚠️ ตรวจสอบ Path ให้ถูกต้อง)
+
 import '../widgets/side_menu.dart';
 import '../widgets/home_page_header.dart';
 
-import 'single_ticket_list_page.dart'; 
-import 'single_ticket_page.dart'; 
-import 'package_ticket_page.dart'; 
+// ⚠️ ตรวจสอบว่าคุณมีไฟล์เหล่านี้
+import 'package_ticket_page.dart';
+import 'single_ticket_list_page.dart';
+import 'single_ticket_page.dart';
 import 'user_page.dart';
 
 class HomePage extends StatefulWidget {
- const HomePage({super.key});
+const HomePage({super.key});
 
- @override
- State<HomePage> createState() => _HomePageState();
+@override
+State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
- int _selectedIndex = 0; 
+ // 👈 2. [FIX] สร้าง Instance ของ API ที่จะใช้
+ final PaymentApi _paymentApi = PaymentApi();
 
- // --- [แก้ไข] 1. State ใหม่: ความจริงหนึ่งเดียว ---
- List<Ticket> _selectedTickets = [];
+final GlobalKey<State<SingleTicketPage>> _ticketPageStateKey = GlobalKey();
 
- // State สำหรับ Payment (ยังต้องใช้)
- List<PaymentMethod> _paymentMethods = [];
- bool _isLoadingMethods = true;
- // ---
+int _selectedIndex = 0;
+Ticket? _selectedTicket;
+List<PaymentMethod> _paymentMethods = [];
+bool _isLoadingMethods = true; // เริ่มต้นด้วย true
 
- @override
- void initState() {
-  super.initState();
-  _loadPaymentMethods(); 
- }
+@override
+void initState() {
+ super.initState();
+ _loadPaymentMethods(); // เรียกฟังก์ชันที่แก้ไขแล้ว
+}
 
- // (ฟังก์ชันโหลด Payment Methods จำลอง - เหมือนเดิม)
- Future<void> _loadPaymentMethods() async {
-  setState(() => _isLoadingMethods = true);
-  await Future.delayed(const Duration(milliseconds: 500)); 
-  final dummyData = [
-   { 'id': 1, 'code': 'CASH', 'name': 'ເງິນສົດ', 'is_active': true, 'created_at': DateTime.now().toIso8601String(), 'updated_at': DateTime.now().toIso8601String(), 'config': null },
-   { 'id': 2, 'code': 'QR', 'name': 'QR', 'is_active': true, 'created_at': DateTime.now().toIso8601String(), 'updated_at': DateTime.now().toIso8601String(), 'config': null }
-  ];
+// -------------------------------------------------------------
+// 🎯 [FIX] 3. แก้ไขฟังก์ชันนี้ให้เรียก API จริง
+// -------------------------------------------------------------
+Future<void> _loadPaymentMethods() async {
+ setState(() => _isLoadingMethods = true);
+
+ try {
+  // 1. เรียก API จริง (แทน dummyData)
+  final fetchedMethods = await _paymentApi.fetchPaymentMethods();
+
+  // 2. อัปเดต State ด้วยข้อมูลจริง
+  if (mounted) {
   setState(() {
-   _paymentMethods = dummyData.map((map) => PaymentMethod.fromMap(map)).toList();
+   _paymentMethods = fetchedMethods;
    _isLoadingMethods = false;
   });
- }
-
- // Callback เมนูซ้าย
- void _onMenuItemTapped(int index) {
-  setState(() {
-   _selectedIndex = index;
-   _selectedTickets = []; // [แก้ไข] ล้างการเลือก เมื่อเปลี่ยนเมนู
-  });
- }
-
- // --- [แก้ไข] 2. Callback ใหม่: "กดตั๋ว" ---
-  // (Logic ใหม่: กด 1 ครั้ง = ติ๊ก/เอาติ๊กออก)
- void _onTicketTapped(Ticket ticket) {
-  setState(() {
-   final isSelected = _selectedTickets.any((t) => t.ticketId == ticket.ticketId);
-
-   if (isSelected) {
-    // ถ้าเลือกอยู่แล้ว -> เอาออก
-    _selectedTickets.removeWhere((t) => t.ticketId == ticket.ticketId);
-   } else {
-    // ถ้ายังไม่เลือก -> เพิ่ม
-    _selectedTickets.add(ticket);
-   }
-  });
- }
- // --- [สิ้นสุดการแก้ไข] ---
-
- // ฟังก์ชันสร้างเนื้อหา
- Widget _buildCurrentPage() {
-    if (_isLoadingMethods) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-  switch (_selectedIndex) {
-   case 0:
-    return Row(
-     children: [
-      // [แก้ไข] 3. ส่ง State และ Callback ใหม่
-      Expanded(
-       flex: 3,
-       child: SingleTicketListPage(
-        onTicketTapped: _onTicketTapped, // Callback ใหม่
-        selectedTickets: _selectedTickets, // List ใหม่
-       ),
-      ),
-
-      // [แก้ไข] 4. ส่ง State ใหม่
-      SingleTicketPage(
-       selectedTickets: _selectedTickets, // List ใหม่
-       paymentMethods: _paymentMethods,
-      ),
-     ],
-    );
-
-   // ... (case 1, 2 ... เหมือนเดิม)
-   case 1:
-    return const PackageTicketPage();
-   case 2:
-    return const UserPage();
-   default:
-    return const Center(child: Text("Page not found"));
+  }
+ } catch (e) {
+  // 3. จัดการ Error (เช่น API ล้มเหลว)
+  print("Error loading payment methods: $e");
+  if (mounted) {
+   setState(() => _isLoadingMethods = false);
+   // (ทางเลือก) แสดง Error Message ให้ผู้ใช้
+   ScaffoldMessenger.of(context).showSnackBar(
+   SnackBar(
+    backgroundColor: Colors.red,
+    content: Text('Failed to load payment methods. Please try again.'),
+   ),
+   );
   }
  }
+}
+// -------------------------------------------------------------
 
- @override
- Widget build(BuildContext context) {
-  return Scaffold(
-   backgroundColor: Colors.white, 
-   body: SafeArea(
-    child: Column(
-     children: [
-      HomePageHeader(),
-      Expanded(
-       child: Row(
-        children: [
-         SideMenu(
-          selectedIndex: _selectedIndex,
-          onMenuItemTapped: _onMenuItemTapped,
-         ),
-         Expanded(child: _buildCurrentPage()),
-        ],
-       ),
-      ),
-     ],
-    ),
-   ),
-  );
+void _onMenuItemTapped(int index) {
+ setState(() {
+ _selectedIndex = index;
+ _selectedTicket = null;
+ ( _ticketPageStateKey.currentState as dynamic)?.clearAllState();
+ });
+}
+
+void _onTicketSelected(Ticket ticket) {
+ setState(() {
+ _selectedTicket = ticket;
+ });
+}
+
+// (ฟังก์ชัน _startPaymentProcess - เหมือนเดิม)
+void _startPaymentProcess(
+ List<CartItem> cart, double totalPrice, int adultQty, int childQty
+) async {
+ if (cart.isEmpty) return;
+  if (!mounted) return; 
+
+ final bool? resetFlag = await Navigator.push(
+ context,
+ MaterialPageRoute(
+  builder: (context) => PaymentPage(
+      cart: cart,
+      totalPrice: totalPrice,
+      adultQty: adultQty,
+      childQty: childQty,
+      paymentMethods: _paymentMethods, // 👈 ส่งข้อมูลจริง (ที่โหลดมา) ไปต่อ
+  ),
+ ),
+ );
+
+ if (resetFlag == true) {
+ (_ticketPageStateKey.currentState as dynamic)?.clearAllState();
+ setState(() {
+  _selectedTicket = null;
+ });
  }
+}
+
+Widget _buildCurrentPage() {
+ if (_isLoadingMethods) {
+ // 👈 ตอนนี้จะแสดงผลตอนที่โหลด API จริง
+ return const Center(child: CircularProgressIndicator());
+ }
+
+ // (ส่วนที่เหลือของ _buildCurrentPage - เหมือนเดิม)
+ switch (_selectedIndex) {
+ case 0:
+  return Row(
+  children: [
+   Expanded(
+   flex: 3,
+   child: SingleTicketListPage(
+    onTicketSelected: _onTicketSelected,
+    selectedTicket: _selectedTicket,
+   ),
+   ),
+   SingleTicketPage(
+   key: _ticketPageStateKey, 
+   ticket: _selectedTicket,
+   onTicketSelected: _onTicketSelected,
+   paymentMethods: _paymentMethods,
+   onCheckout: _startPaymentProcess, 
+   ),
+  ],
+  );
+
+ case 1:
+  return const PackageTicketPage(); 
+ case 2:
+  return const UserPage();
+ default:
+  return const Center(child: Text("Page not found"));
+ }
+}
+
+@override
+Widget build(BuildContext context) {
+ // (ส่วน Build - เหมือนเดิม)
+ return Scaffold(
+ backgroundColor: Colors.white,
+ body: SafeArea(
+  child: Column(
+  children: [
+   const HomePageHeader(),
+   Expanded(
+   child: Row(
+    children: [
+    SideMenu(
+     selectedIndex: _selectedIndex,
+     onMenuItemTapped: _onMenuItemTapped,
+    ),
+    Expanded(child: _buildCurrentPage()),
+    ],
+   ),
+   ),
+  ],
+  ),
+ ),
+ );
+}
 }

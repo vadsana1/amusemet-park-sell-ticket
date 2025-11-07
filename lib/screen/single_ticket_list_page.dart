@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 import '../models/ticket.dart';
 import '../widgets/ticket_card.dart';
-import '../services/ticket_api.dart'; 
+import '../services/ticket_api.dart'; // <-- [แก้ไข] เพิ่มบรรทัดนี้
 
 class SingleTicketListPage extends StatefulWidget {
- // [แก้ไข] 1. รับ State และ Callback ใหม่ (แบบง่าย)
- final List<Ticket> selectedTickets;
- final void Function(Ticket ticket) onTicketTapped;
+ // [แก้ไข] 1. รับ State และ Callback แบบง่าย
+ final Ticket? selectedTicket;
+ final void Function(Ticket ticket) onTicketSelected;
 
  const SingleTicketListPage({
   super.key,
-  required this.onTicketTapped,
-  required this.selectedTickets,
+  required this.onTicketSelected,
+  this.selectedTicket,
  });
 
  @override
@@ -19,6 +19,7 @@ class SingleTicketListPage extends StatefulWidget {
 }
 
 class _SingleTicketListPageState extends State<SingleTicketListPage> {
+  // ตอนนี้ Flutter รู้จัก 'TicketApi' แล้ว
  final TicketApi _ticketApi = TicketApi();
  late Future<List<Ticket>> _futureTickets;
 
@@ -33,7 +34,7 @@ class _SingleTicketListPageState extends State<SingleTicketListPage> {
   return FutureBuilder<List<Ticket>>(
    future: _futureTickets,
    builder: (context, snapshot) {
-    // ... (ส่วน Loading, Error ... เหมือนเดิม)
+    // --- ส่วนจัดการสถานะ (Loading, Error) ---
     if (snapshot.connectionState == ConnectionState.waiting) {
      return const Center(child: CircularProgressIndicator());
     }
@@ -44,6 +45,7 @@ class _SingleTicketListPageState extends State<SingleTicketListPage> {
      return const Center(child: Text('ไม่พบข้อมูลตั๋ว'));
     }
 
+    // --- เมื่อสำเร็จ (Success) ---
     final List<Ticket> allTickets = snapshot.data!; 
     final List<Ticket> ticketList = allTickets
       .where((ticket) => ticket.type == 'single') 
@@ -66,9 +68,9 @@ class _SingleTicketListPageState extends State<SingleTicketListPage> {
      itemBuilder: (context, index) {
       final ticket = ticketList[index];
 
-      // [แก้ไข] 4. ตรวจสอบการเลือก จาก List ใหม่
+      // [แก้ไข] 4. ตรวจสอบการเลือก (แบบง่าย)
       final bool isSelected =
-        widget.selectedTickets.any((t) => t.ticketId == ticket.ticketId);
+        widget.selectedTicket?.ticketId == ticket.ticketId;
 
       // 5. สร้าง TicketCard
       return TicketCard(
@@ -77,7 +79,7 @@ class _SingleTicketListPageState extends State<SingleTicketListPage> {
        // [แก้ไข] 6. Logic การ OnTap (ง่ายขึ้น)
        onTap: () {
         // เรียก Callback ไปที่ HomePage
-        widget.onTicketTapped(ticket);
+        widget.onTicketSelected(ticket);
        },
       );
      },

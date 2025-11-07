@@ -1,35 +1,38 @@
-// import 'dart.convert';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:uuid/uuid.dart';
+import 'dart:developer';
 
-// (แก้ path 4 บรรทัดนี้ให้ตรงกับโปรเจกต์ของคุณ)
+// (ກວດສອບ Path ໃຫ້ຖືກຕ້ອງ)
 import '../models/new_visitor_ticket.dart';
 import '../models/cart_item.dart';
 import '../models/api_ticket_response.dart';
 import './receipt_page.dart';
-import '../services/newticket_api.dart'; // (Service ของคุณ)
+import '../services/newticket_api.dart';
 
 class PaymentCashView extends StatefulWidget {
   final double totalPrice;
   final List<CartItem> cart;
   final String paymentMethodCode;
-  // [เพิ่ม] 1. รับข้อมูล Visitor
   final String visitorFullName;
   final String visitorPhone;
   final String visitorGender;
-  // final String visitorType; // <-- ลบออก
+  // 🎯 ຮັບຈຳນວນຄົນທັງໝົດ
+  final int globalAdultQty;
+  final int globalChildQty;
 
   const PaymentCashView({
     super.key,
     required this.totalPrice,
     required this.cart,
     required this.paymentMethodCode,
-    // [เพิ่ม] 2. เพิ่มใน Constructor
     required this.visitorFullName,
     required this.visitorPhone,
     required this.visitorGender,
-    // required this.visitorType, // <-- ลบออก
+    required this.globalAdultQty,
+    required this.globalChildQty,
   });
 
   @override
@@ -40,7 +43,7 @@ class _PaymentCashViewState extends State<PaymentCashView> {
   final VisitorApi _visitorApi = VisitorApi();
   bool _isProcessing = false;
 
-  // ... (State, initState, dispose, Getters, Logic Functions ... เหมือนเดิม) ...
+  // --- State (ຄືເກົ່າ) ---
   final List<double> _denominations = const [
     1000,
     2000,
@@ -54,11 +57,13 @@ class _PaymentCashViewState extends State<PaymentCashView> {
   final currencyFormat = NumberFormat("#,##0", "en_US");
   final TextEditingController _amountController = TextEditingController();
   double _amountReceived = 0.0;
+  // ---
+
   @override
   void initState() {
     super.initState();
     _cashCounts = {for (var d in _denominations) d: 0};
-    _amountReceived = widget.totalPrice;
+    _amountReceived = 0.0;
     _amountController.text = currencyFormat.format(_amountReceived);
   }
 
@@ -73,6 +78,7 @@ class _PaymentCashViewState extends State<PaymentCashView> {
     return (change < 0) ? 0 : change;
   }
 
+  // --- Logic Functions (ຄືເກົ່າ) ---
   void _updateFromButtons(double denomination, int change) {
     setState(() {
       int currentCount = _cashCounts[denomination] ?? 0;
@@ -98,17 +104,29 @@ class _PaymentCashViewState extends State<PaymentCashView> {
   void _clearAll() {
     setState(() {
       _cashCounts = {for (var d in _denominations) d: 0};
-      _amountReceived = widget.totalPrice;
+      _amountReceived = 0.0;
       _amountController.text = currencyFormat.format(_amountReceived);
     });
   }
-  // --- [จบส่วนโค้ดเดิม] ---
 
-  // --- [แก้ไข] ฟังก์ชันสำหรับสร้าง JSON และยืนยัน ---
+  // --- ຟັງຊັນສຳລັບສ້າງ JSON ແລະ ຢືນຢັນ ---
   Future<void> _handleConfirmPayment() async {
+    if (_amountReceived < widget.totalPrice) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('ຈຳນວນເງິນທີ່ໄດ້ຮັບໜ້ອຍກວ່າລາຄາປີ້'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
     if (_isProcessing) return;
     setState(() => _isProcessing = true);
 
+    // 1. ສ້າງ cashDetailsList (ຄືເກົ່າ)
     final List<CashDetail> cashDetailsList = [];
     _cashCounts.forEach((denomination, quantity) {
       if (quantity > 0) {
@@ -118,65 +136,149 @@ class _PaymentCashViewState extends State<PaymentCashView> {
       }
     });
 
+    // 2. ສ້າງ ticketDetails (Flattening ພ້ອມ gender) (ຄືເກົ່າ)
     final List<TicketDetail> ticketDetails = [];
     for (var item in widget.cart) {
       for (int i = 0; i < item.quantityAdult; i++) {
         ticketDetails.add(
-          TicketDetail(ticketId: item.ticket.ticketId, visitorType: 'adult'),
+          TicketDetail(
+            ticketId: item.ticket.ticketId,
+            visitorType: 'adult',
+            gender: widget.visitorGender,
+          ),
         );
       }
       for (int i = 0; i < item.quantityChild; i++) {
         ticketDetails.add(
-          TicketDetail(ticketId: item.ticket.ticketId, visitorType: 'child'),
+          TicketDetail(
+            ticketId: item.ticket.ticketId,
+            visitorType: 'child',
+            gender: widget.visitorGender,
+          ),
         );
       }
     }
 
-    // [แก้ไข] สร้าง Payload โดยใช้ข้อมูลจริงจากฟอร์ม
-    final payload = NewVisitorTicket(
-      visitorUid: 'UID-${DateTime.now().millisecondsSinceEpoch}',
-      fullName: widget.visitorFullName,
-      phone: widget.visitorPhone,
-      gender: widget.visitorGender,
+   
+    // 3. ນັບຈຳນວນຄົນທັງໝົດ (ແກ້ໄຂ)
+    int totalPeople = widget.globalAdultQty + widget.globalChildQty;
+    if (totalPeople == 0) {
+      setState(() => _isProcessing = false);
+      return;
+    }
 
-      // visitorType: widget.visitorType, // <-- ลบออก
-      tickets: ticketDetails,
-      paymentMethod: widget.paymentMethodCode,
-      amountDue: widget.totalPrice.toInt(),
-      amountPaid: _amountReceived.toInt(),
-      changeAmount: _calculatedChange.toInt(),
-      paymentTransactions: cashDetailsList,
-    );
-
-    // --- ເອີ້ນໃຊ້ API ແທ້ ---
+    // --- 4. ສ້າງ Payload ໃຫ້ຕົງກັບ API ---
     try {
-      print('--- 💸 ສົ່ງ API (${widget.paymentMethodCode}) ---');
-      final Map<String, dynamic> responseMap = await _visitorApi.sellDayPass(
-        payload,
+      log(
+        '--- 💸 ສົ່ງ API (${widget.paymentMethodCode}) - ($totalPeople ຄົນ) ---',
       );
-      final ApiTicketResponse apiResponse = ApiTicketResponse.fromMap(
-        responseMap,
-      );
+      List<ApiTicketResponse> apiResponses = [];
 
-      print('--- ✅ API Response (ແທ້) ---');
-      print('Purchase ID: ${apiResponse.purchaseId}');
+      // ສ້າງ Object ຂໍ້ມູນຜູ້ຊື້ແຍກ
+      final Map<String, dynamic> visitorDetails = {
+        "visitor_uid": const Uuid().v4(),
+        "full_name": widget.visitorFullName,
+        "phone": widget.visitorPhone,
+        "gender": widget.visitorGender,
+      };
+
+      // ສ້າງ Base Payload (ບໍ່ມີຂໍ້ມູນຜູ້ຊື້)
+      final List<Map<String, dynamic>> ticketsPayload = ticketDetails
+          .map((ticket) => ticket.toMap())
+          .toList();
+      final List<Map<String, dynamic>> cashPayload = cashDetailsList
+          .map((cash) => cash.toMap())
+          .toList();
+
+      final Map<String, dynamic> basePayload = {
+        "tickets": ticketsPayload,
+        "payment_method": widget.paymentMethodCode,
+        "amount_due": widget.totalPrice.toInt(),
+        "amount_paid": _amountReceived.toInt(),
+        "change_amount": _calculatedChange.toInt(),
+        "payment_transactions": cashPayload,
+      };
+
+      // 🎯 [LOGIC ທີ່ຖືກຕ້ອງຢູ່ບ່ອນນີ້] ຕ້ອງກວດສອບຈຳນວນຄົນ
+      if (totalPeople == 1) {
+        // --- (A) 1 ປີ້: ໃຊ້ໂຄງສ້າງ FLAT ---
+        final Map<String, dynamic> flatPayload = {
+          ...basePayload,
+          ...visitorDetails, // <-- ແຍກຂໍ້ມູນຜູ້ຊື້ມາໄວ້ລະດັບນອກ
+        };
+        log('Payload 1-Ticket (Flat) Sent: ${json.encode(flatPayload)}');
+
+        log('Calling API (A): sellDayPass');
+        final Map<String, dynamic> responseMap = await _visitorApi.sellDayPass(
+          flatPayload,
+        );
+
+        // ສົ່ງຈຳນວນຄົນໄປໃຫ້ FromMap
+        apiResponses.add(
+          ApiTicketResponse.fromMap(
+            responseMap,
+            globalAdultQty: widget.globalAdultQty,
+            globalChildQty: widget.globalChildQty,
+          ),
+        );
+      } else {
+        // --- (B) ຫຼາຍປີ້: ໃຊ້ໂຄງສ້າງ NESTED ---
+        final Map<String, dynamic> nestedPayload = {
+          ...basePayload,
+          "visitor": visitorDetails, // <-- ຂໍ້ມູນຜູ້ຊື້ຖືກຊ້ອນຢູ່ໃນ "visitor"
+        };
+        log('Payload Multiple (Nested) Sent: ${json.encode(nestedPayload)}');
+
+        log('Calling API (B): sellDayPassMultiple');
+        final List<dynamic> responseList = await _visitorApi
+            .sellDayPassMultiple(nestedPayload);
+
+        // Loop ຜ່ານ List ທີ່ໄດ້ຮັບຈາກ "purchases"
+        apiResponses = responseList.map((map) {
+          final responseData = map as Map<String, dynamic>;
+          // API (B) ສົ່ງ `ticket_type` ມາ, ບໍ່ແມ່ນ `globalQty`
+          return ApiTicketResponse.fromMap(
+            responseData,
+            globalAdultQty: responseData['ticket_type'] == 'adult' ? 1 : 0,
+            globalChildQty: responseData['ticket_type'] == 'child' ? 1 : 0,
+          );
+        }).toList();
+      }
+
+      log('--- ✅ API Response (ແທ້) ---');
+      log('ໄດ້ QR ທັງໝົດ: ${apiResponses.length} ໃບ');
 
       if (!mounted) return;
-      Navigator.push(
+
+      // 🎯 "Pop Chain" Logic (ຄືເກົ່າ)
+      final bool? receiptResult = await Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => ReceiptPage(response: apiResponse),
+          builder: (context) => ReceiptPage(
+            responses: apiResponses,
+          
+          ),
         ),
       );
+
+      if (receiptResult == true) {
+        if (mounted) {
+          Navigator.of(
+            context,
+          ).pop(true); // ⬅️ ສົ່ງສັນຍານ "ສຳເລັດ" (true) ກັບຄືນໄປຫາ HomePage
+        }
+      }
     } catch (e) {
-      print("--- ❌ API Error ---");
-      print(e.toString());
+      log("--- ❌ API Error ---");
+      log(e.toString());
       if (!mounted) return;
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
           title: const Text('Error'),
-          content: Text('ເກີດຂໍ້ຜິດພາດ: ${e.toString()}'),
+          content: Text(
+            'ເກີດຂໍ້ຜິດພາດ: ${e.toString().split("Exception: ").last}',
+          ),
           actions: [
             TextButton(
               child: const Text('ຕົກລົງ'),
@@ -186,15 +288,16 @@ class _PaymentCashViewState extends State<PaymentCashView> {
         ),
       );
     } finally {
-      setState(() => _isProcessing = false);
+      if (mounted) {
+        setState(() => _isProcessing = false);
+      }
     }
   }
 
-  // --- Build Method ---
+  // --- Build Method ແລະ Helper Widgets (ຄືເກົ່າ) ---
   @override
   Widget build(BuildContext context) {
     bool canConfirm = _amountReceived >= widget.totalPrice && !_isProcessing;
-
     return Column(
       children: [
         Padding(
@@ -217,8 +320,6 @@ class _PaymentCashViewState extends State<PaymentCashView> {
       ],
     );
   }
-
-  // --- Helper Widgets ---
 
   Widget _buildDenominationButtons() {
     return Wrap(
@@ -247,7 +348,7 @@ class _PaymentCashViewState extends State<PaymentCashView> {
                 ),
                 child: Center(
                   child: Text(
-                    '${currencyFormat.format(denomination)}',
+                    currencyFormat.format(denomination),
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -373,7 +474,7 @@ class _PaymentCashViewState extends State<PaymentCashView> {
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
-              child: const Text('ຍົກເລີກ'), // ยกเลิก
+              child: const Text('ຍົກເລີກ'),
             ),
           ),
           const SizedBox(width: 16),
@@ -397,7 +498,7 @@ class _PaymentCashViewState extends State<PaymentCashView> {
                         strokeWidth: 3,
                       ),
                     )
-                  : const Text('ຢືນຢັນ'), // ยืนยัน
+                  : const Text('ຢືນຢັນ'),
             ),
           ),
         ],
@@ -406,7 +507,6 @@ class _PaymentCashViewState extends State<PaymentCashView> {
   }
 }
 
-// (คลาส ThousandsFormatter เหมือนเดิม)
 class ThousandsFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(

@@ -1,42 +1,95 @@
 import "package:http/http.dart" as http;
 import "dart:convert";
-import 'package:flutter_dotenv/flutter_dotenv.dart'; // <-- [ເພີ່ມ] 1. ຕ້ອງ Import dotenv
-import '../models/new_visitor_ticket.dart'; 
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+// import '../models/new_visitor_ticket.dart'; // ❌ ບໍ່ຈຳເປັນຕ້ອງໃຊ້ NewVisitorTicket ແລ້ວ
 
 class VisitorApi {
- final String baseUrl;
+  final String baseUrl;
 
- VisitorApi({String? baseUrl})
-  : baseUrl = baseUrl ?? dotenv.env['api_url'] ?? '';
+  VisitorApi({String? baseUrl})
+    : baseUrl = baseUrl ?? dotenv.env['api_url'] ?? '';
 
- Future<Map<String, dynamic>> sellDayPass(NewVisitorTicket newTicket) async {
-  try {
-   final response = await http.post(
-    Uri.parse('$baseUrl/api/visitor/sell-day-pass'),
-    headers: {
-     'Content-Type': 'application/json; charset=UTF-8',
-          // --- [ແກ້ໄຂ] 2. ເພີ່ມ 2 ແຖວນີ້ເຂົ້າໄປ (ຄືກັບຕົວຢ່າງ) ---
-     'Authorization': 'Bearer ${dotenv.env['token'] ?? ''}',
-     'X-Device-ID': dotenv.env['device_id'] ?? '',
-          // --- [ສິ້ນສຸດການແກ້ໄຂ] ---
-    },
-    body: newTicket.toJson(),
-   );
+  // --- 1. API (A) ສຳລັບ 1 QR (ແກ້ໄຂໃຫ້ຮັບ Map) ---
+  Future<Map<String, dynamic>> sellDayPass(
+    // 🎯 [ແກ້ໄຂ] ປ່ຽນ Type ຈາກ NewVisitorTicket ເປັນ Map
+    Map<String, dynamic> payload,
+  ) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/visitor/sell-day-pass'),
+        headers: {
+          'Content-Type': 'application/json; charset=UTF-8',
+          'Authorization': 'Bearer ${dotenv.env['token'] ?? ''}',
+          'X-Device-ID': dotenv.env['device_id'] ?? '',
+        },
+        // 🎯 [ແກ້ໄຂ] ໃຊ້ json.encode(payload) ໂດຍກົງ
+        body: json.encode(payload),
+      );
 
-   final Map<String, dynamic> jsonResponse = json.decode(response.body);
+      final dynamic jsonResponse = json.decode(response.body);
 
-   if (response.statusCode == 200 || response.statusCode == 201) {
-    // ຖ້າສຳເລັດ
-    return jsonResponse;
-   } else {
-    // ຖ້າບໍ່ສຳເລັດ (ເຊັ່ນ 400, 500)
-    throw Exception(
-     'Failed to sell pass: ${jsonResponse['message'] ?? response.body}',
-    );
-   }
-  } catch (e) {
-   // ຖ້າ Error (ເຊັ່ນ ບໍ່ມີເນັດ)
-   throw Exception('Failed to connect to the server: $e');
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        if (jsonResponse is Map<String, dynamic>) {
+          return jsonResponse;
+        } else {
+          throw Exception('API (A) did not return a Map. Got List instead.');
+        }
+      } else {
+        Map<String, dynamic> errorMap = jsonResponse as Map<String, dynamic>;
+        throw Exception(
+          'Failed to sell pass: ${errorMap['message'] ?? response.body}',
+        );
+      }
+    } catch (e) {
+      throw Exception('Failed to connect to the server: $e');
+    }
   }
- }
+
+  // --- 2. API (B) ສຳລັບຫຼາຍ QR (ແກ້ໄຂໃຫ້ຮັບ Map) ---
+  Future<List<dynamic>> sellDayPassMultiple(
+    Map<String, dynamic> payload,
+  ) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/visitor/sell-day-pass/multiple'),
+        headers: {
+          'Content-Type': 'application/json; charset=UTF-8',
+          'Authorization': 'Bearer ${dotenv.env['token'] ?? ''}',
+          'X-Device-ID': dotenv.env['device_id'] ?? '',
+        },
+        body: json.encode(payload),
+      );
+
+      final dynamic jsonResponse = json.decode(response.body);
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        if (jsonResponse is Map<String, dynamic>) {
+          
+          // 🎯 FIX: CHANGE THE KEY FROM 'data' or 'tickets' to 'purchases'
+          final List<dynamic>? dataList = jsonResponse['purchases'] as List<dynamic>?; 
+
+          if (dataList != null) {
+            return dataList; // ✅ Returns the list of purchase objects
+          } else {
+            // This happens if the API succeeded but 'purchases' key was missing
+            throw Exception(
+                'API (B) returned a Map but is missing the expected "purchases" list.');
+          }
+        } else if (jsonResponse is List) {
+          // Fallback if the API returns a raw list
+          return jsonResponse; 
+        } else {
+          throw Exception('API (B) did not return expected data format.');
+        }
+      } else {
+        // Handle error status codes (same as before)
+        Map<String, dynamic> errorMap = jsonResponse as Map<String, dynamic>;
+        throw Exception(
+          'Failed to sell multiple passes: ${errorMap['message'] ?? response.body}',
+        );
+      }
+    } catch (e) {
+      throw Exception('Failed to connect to the server: $e');
+    }
+  }
 }

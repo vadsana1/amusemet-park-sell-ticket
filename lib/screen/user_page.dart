@@ -11,7 +11,7 @@ class UserPage extends StatelessWidget {
       color: Colors.white,
       child: Center(
         child: Text(
-          'เนื้อหาหน้า "ผู้ใช้งาน"',
+          'ຜູ້ໃຊ້',
           style: TextStyle(fontSize: 24, color: Colors.black),
         ),
       ),
