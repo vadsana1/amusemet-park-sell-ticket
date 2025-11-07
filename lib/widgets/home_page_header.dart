@@ -9,37 +9,46 @@ class HomePageHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       height: 80.0,
-      color: Colors.teal[400], // <--- 1. เปลี่ยนสีพื้นหลังเป็น "สีเขียว"
+      color: Colors.teal[400],
       padding: const EdgeInsets.symmetric(horizontal: 20.0),
       child: Row(
         children: [
-          // ไอคอนรูปดาว/โลก
           CircleAvatar(
             radius: 25.0,
-            backgroundColor:
-                Colors.purple[700], // ใส่สีพื้นหลังไว้กันรูปโหลดไม่ขึ้น
+            backgroundColor: Colors.purple[700],
             child: ClipOval(
-              // <--- 1. ใช้ ClipOval เพื่อตัดรูป
               child: Image.asset(
-                'assets/images/logo.png', // <-- 2. Path ไปยังรูป
-                fit: BoxFit.cover, // 3. สั่งให้รูปเต็มวงกลม
-                width: 50.0, // (radius * 2)
-                height: 50.0, // (radius * 2)
+                'assets/images/logo.png', 
+                fit: BoxFit.cover,
+                width: 50.0, 
+                height: 50.0, 
               ),
-            )
+            ),
           ),
-          SizedBox(width: 15.0),
+          const SizedBox(width: 15.0),
 
-          // ข้อความ "ລະບົບຂາຍປີ້ສວນສະໜຸກ"
-          Text(
+          
+          const Text(
             'ລະບົບຂາຍປີ້ສວນສະໜຸກ',
             style: TextStyle(
               fontSize: 24.0,
               fontWeight: FontWeight.bold,
-              color: Colors.white, // <--- 2. เปลี่ยนสีข้อความเป็น "สีขาว"
+              color: Colors.white,
             ),
           ),
-          // (เราลบ Spacer และปุ่มเมนูออกไปแล้ว)
+
+      const Spacer(),
+          IconButton(
+            icon: const Icon(
+              Icons.error_outline,
+              color: Colors.white, 
+              size: 30.0, 
+            ),
+            onPressed: () {
+              
+              print('icon pressed!');
+            },
+          ),
         ],
       ),
     );

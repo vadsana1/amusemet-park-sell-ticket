@@ -250,7 +250,7 @@ class _PaymentCashViewState extends State<PaymentCashView> {
 
       if (!mounted) return;
 
-      // 🎯 "Pop Chain" Logic (ຄືເກົ່າ)
+
       final bool? receiptResult = await Navigator.push(
         context,
         MaterialPageRoute(
@@ -265,7 +265,7 @@ class _PaymentCashViewState extends State<PaymentCashView> {
         if (mounted) {
           Navigator.of(
             context,
-          ).pop(true); // ⬅️ ສົ່ງສັນຍານ "ສຳເລັດ" (true) ກັບຄືນໄປຫາ HomePage
+          ).pop(true); 
         }
       }
     } catch (e) {
@@ -294,7 +294,7 @@ class _PaymentCashViewState extends State<PaymentCashView> {
     }
   }
 
-  // --- Build Method ແລະ Helper Widgets (ຄືເກົ່າ) ---
+
   @override
   Widget build(BuildContext context) {
     bool canConfirm = _amountReceived >= widget.totalPrice && !_isProcessing;

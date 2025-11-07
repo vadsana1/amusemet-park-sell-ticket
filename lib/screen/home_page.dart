@@ -4,13 +4,11 @@ import '../models/payment_method.dart';
 import '../models/cart_item.dart';
 import 'payment_page.dart';
 
-// 👈 1. [FIX] Import API จริง
-import '../services/payment_api.dart'; // (⚠️ ตรวจสอบ Path ให้ถูกต้อง)
+import '../services/payment_api.dart'; 
 
 import '../widgets/side_menu.dart';
 import '../widgets/home_page_header.dart';
 
-// ⚠️ ตรวจสอบว่าคุณมีไฟล์เหล่านี้
 import 'package_ticket_page.dart';
 import 'single_ticket_list_page.dart';
 import 'single_ticket_page.dart';
@@ -24,7 +22,6 @@ State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
- // 👈 2. [FIX] สร้าง Instance ของ API ที่จะใช้
  final PaymentApi _paymentApi = PaymentApi();
 
 final GlobalKey<State<SingleTicketPage>> _ticketPageStateKey = GlobalKey();
@@ -32,25 +29,22 @@ final GlobalKey<State<SingleTicketPage>> _ticketPageStateKey = GlobalKey();
 int _selectedIndex = 0;
 Ticket? _selectedTicket;
 List<PaymentMethod> _paymentMethods = [];
-bool _isLoadingMethods = true; // เริ่มต้นด้วย true
+bool _isLoadingMethods = true; 
 
 @override
 void initState() {
  super.initState();
- _loadPaymentMethods(); // เรียกฟังก์ชันที่แก้ไขแล้ว
+ _loadPaymentMethods();
 }
 
-// -------------------------------------------------------------
-// 🎯 [FIX] 3. แก้ไขฟังก์ชันนี้ให้เรียก API จริง
-// -------------------------------------------------------------
+
 Future<void> _loadPaymentMethods() async {
  setState(() => _isLoadingMethods = true);
 
  try {
-  // 1. เรียก API จริง (แทน dummyData)
+
   final fetchedMethods = await _paymentApi.fetchPaymentMethods();
 
-  // 2. อัปเดต State ด้วยข้อมูลจริง
   if (mounted) {
   setState(() {
    _paymentMethods = fetchedMethods;
@@ -58,11 +52,11 @@ Future<void> _loadPaymentMethods() async {
   });
   }
  } catch (e) {
-  // 3. จัดการ Error (เช่น API ล้มเหลว)
+
   print("Error loading payment methods: $e");
   if (mounted) {
    setState(() => _isLoadingMethods = false);
-   // (ทางเลือก) แสดง Error Message ให้ผู้ใช้
+
    ScaffoldMessenger.of(context).showSnackBar(
    SnackBar(
     backgroundColor: Colors.red,
@@ -72,7 +66,7 @@ Future<void> _loadPaymentMethods() async {
   }
  }
 }
-// -------------------------------------------------------------
+
 
 void _onMenuItemTapped(int index) {
  setState(() {
@@ -88,7 +82,7 @@ void _onTicketSelected(Ticket ticket) {
  });
 }
 
-// (ฟังก์ชัน _startPaymentProcess - เหมือนเดิม)
+
 void _startPaymentProcess(
  List<CartItem> cart, double totalPrice, int adultQty, int childQty
 ) async {
@@ -118,11 +112,11 @@ void _startPaymentProcess(
 
 Widget _buildCurrentPage() {
  if (_isLoadingMethods) {
- // 👈 ตอนนี้จะแสดงผลตอนที่โหลด API จริง
+
  return const Center(child: CircularProgressIndicator());
  }
 
- // (ส่วนที่เหลือของ _buildCurrentPage - เหมือนเดิม)
+
  switch (_selectedIndex) {
  case 0:
   return Row(
@@ -155,7 +149,7 @@ Widget _buildCurrentPage() {
 
 @override
 Widget build(BuildContext context) {
- // (ส่วน Build - เหมือนเดิม)
+
  return Scaffold(
  backgroundColor: Colors.white,
  body: SafeArea(

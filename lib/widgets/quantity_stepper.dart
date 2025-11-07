@@ -40,7 +40,7 @@ class QuantityStepper extends StatelessWidget {
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
         ),
-        // ปุ่มเพิ่ม (+)
+        
         SizedBox(
           width: 30,
           height: 30,

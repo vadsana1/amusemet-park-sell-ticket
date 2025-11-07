@@ -24,6 +24,12 @@ class ReceiptPage extends StatefulWidget {
 }
 
 class _ReceiptPageState extends State<ReceiptPage> {
+  // 🚀 NEW: ຈັດຮູບແບບສະເພາະວັນທີ (dd/MM/yyyy)
+  final dateFormat = DateFormat('dd/MM/yyyy');
+  // 🚀 NEW: ຈັດຮູບແບບສະເພາະເວລາ (HH:mm)
+  final timeFormat = DateFormat('HH:mm');
+  // ປ່ຽນຊື່ fullDateTimeFormat ໃຫ້ຊັດເຈນຂຶ້ນ
+  // final fullDateTimeFormat = DateFormat('dd/MM/yyyy HH:mm:ss');
   final currencyFormat = NumberFormat("#,##0", "en_US");
   // (ຕົວຢ່າງ: ປະກາດ service ຖ້າທ່ານມີ)
   // final ReceiptPrinterService _printerService = ReceiptPrinterService();
@@ -102,7 +108,7 @@ class _ReceiptPageState extends State<ReceiptPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          _buildHeader(response), // ໃຊ້ Helper ເດີມ
+          _buildHeader(response, isFinancialReceipt: true), // 🚀 ໃຊ້ Header ໃໝ່
           const SizedBox(height: 16),
 
           // ⭐️ FIX 2: ປ່ຽນໄປໃຊ້ `response.amountDue` (ຍອດທີ່ຕ້ອງຈ່າຍ)
@@ -149,6 +155,12 @@ class _ReceiptPageState extends State<ReceiptPage> {
           ),
           const SizedBox(height: 16),
 
+          _buildHeader(
+            response,
+            isFinancialReceipt: false,
+          ), // 🚀 ໃຊ້ Header ໃໝ່
+          const SizedBox(height: 16),
+
           _buildInfoRow(
             'ປະເພດປີ້:',
             'ຜູ້ໃຫຍ່ x ${response.adultCount}, ເດັກນ້ອຍ x ${response.childCount}',
@@ -173,9 +185,9 @@ class _ReceiptPageState extends State<ReceiptPage> {
     );
   }
 
- 
+  /// ⭐️ NEW WIDGET 3: ປຸ່ມ Print ທີ່ແຍກອອກມາ
   Widget _buildPrintButton() {
-    
+    // ໃຊ້ Container + width ເພື່ອໃຫ້ຂະໜາດປຸ່ມເທົ່າກັບໃບຮັບເງິນ
     return Container(
       width: 400,
       padding: const EdgeInsets.symmetric(
@@ -188,12 +200,12 @@ class _ReceiptPageState extends State<ReceiptPage> {
           textStyle: const TextStyle(fontSize: 16, fontFamily: 'Phetsarath_OT'),
         ),
         onPressed: _handlePrintAndClose,
-        child: const Text('ພິມ ແລະ ສຳເລັດ'), 
+        child: const Text('ພິມ ແລະ ສຳເລັດ'), // ປ່ຽນຊື່ປຸ່ມໃຫ້ສັ້ນລົງ
       ),
     );
   }
 
-  
+  /// 🚀 NEW HELPER WIDGET: ຈັດລຽງລາຍການເຄື່ອງຫຼິ້ນໃຫ້ຄືກັບຮູບ (ມີວົງມົນ/checkbox)
   Widget _buildRideList(List<String> rideNames) {
     if (rideNames.isEmpty) {
       return const Text(
@@ -202,19 +214,18 @@ class _ReceiptPageState extends State<ReceiptPage> {
       );
     }
 
-   
+    // ຕ້ອງການໃຫ້ແຖວໜຶ່ງມີ 3 ລາຍການ (ຄືກັບໃນຮູບ)
     const int itemsPerRow = 3;
     List<Widget> rows = [];
 
     final displayNames = rideNames;
-
 
     for (int i = 0; i < displayNames.length; i += itemsPerRow) {
       List<Widget> rowItems = [];
       for (int j = 0; j < itemsPerRow; j++) {
         int index = i + j;
         if (index < displayNames.length) {
-          
+          // ສ້າງແຖວຂອງເຄື່ອງຫຼິ້ນ: [ຊື່ເຄື່ອງຫຼິ້ນ O]
           rowItems.add(
             Expanded(
               child: Padding(
@@ -247,28 +258,72 @@ class _ReceiptPageState extends State<ReceiptPage> {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: rows);
   }
 
-  // --- Helper Widgets ໂຕເກົ່າ (ບໍ່ໄດ້ແກ້ໄຂ) ---
-
   // Helper Widget ສຳລັບສ່ວນຫົວ
-  Widget _buildHeader(ApiTicketResponse response) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  // 🚀 ປັບປຸງ: ປ່ຽນຮູບແບບການສະແດງວັນທີ-ເວລາໃຫ້ຄືກັບຮູບ (ຄົນລະແຖວ, ຈັດຂວາ)
+  Widget _buildHeader(
+    ApiTicketResponse response, {
+    required bool isFinancialReceipt,
+  }) {
+    // ໃຊ້ເວລາປັດຈຸບັນເປັນຕົວຢ່າງ (ທ່ານຄວນໃຊ້ response.timestamp ຖ້າມີ)
+    final DateTime now = DateTime.now();
+    final String dateString = dateFormat.format(now); // ໃຊ້ dateFormat ໃໝ່
+    final String timeString = timeFormat.format(now); // ໃຊ້ timeFormat ໃໝ່
+
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Column(
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'ເລກທີໃບບິນ: ${response.purchaseId}',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            if (isFinancialReceipt) // ພາກສ່ວນສະເພາະໃບຮັບເງິນ
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'ເລກທີໃບບິນ: ${response.purchaseId}',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'ຜູ້ຂາຍ: vadsana',
+                      style: TextStyle(fontSize: 16),
+                    ), // ⚠️ ທ່ານອາດຈະຕ້ອງດຶງຊື່ຜູ້ຂາຍມາຈາກບ່ອນອື່ນ
+                  ],
+                ),
+              )
+            else
+              // ສໍາລັບປີ້ QR Stub, ສະແດງຜູ້ຂາຍກ່ອນ (ໃຊ້ Expanded ດ້ວຍເພື່ອໃຫ້ຈັດຂວາໄດ້)
+              const Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(bottom: 8.0),
+                  child: Text(
+                    'ຜູ້ຂາຍ: vadsana',
+                    style: TextStyle(fontSize: 16),
+                  ),
+                ),
+              ),
+
+            Column(
+              crossAxisAlignment:
+                  CrossAxisAlignment.end, // ຈັດວາງຂໍ້ຄວາມຢູ່ເບື້ອງຂວາ
+              children: [
+                Text(
+                  'ວັນທີ: $dateString',
+                  style: const TextStyle(fontSize: 16),
+                ),
+                Text('ເວລາ: $timeString', style: const TextStyle(fontSize: 16)),
+              ],
             ),
-            const SizedBox(height: 8),
-            const Text(
-              'ຜູ້ຂາຍ: vadsana',
-            ), // ⚠️ ທ່ານອາດຈະຕ້ອງດຶງຊື່ຜູ້ຂາຍມາຈາກບ່ອນອື່ນ
           ],
         ),
-        Text('ວັນທີ: ${DateFormat('dd/MM/yyyy').format(DateTime.now())}'),
+
+        if (isFinancialReceipt)
+          const SizedBox(height: 8), // ເພີ່ມໄລຍະຫ່າງລຸ່ມສຸດສໍາລັບໃບຮັບເງິນ
       ],
     );
   }

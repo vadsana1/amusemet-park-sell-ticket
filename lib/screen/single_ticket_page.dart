@@ -3,10 +3,8 @@ import '../models/ticket.dart';
 import '../models/cart_item.dart';
 import '../models/payment_method.dart';
 import '../widgets/quantity_stepper.dart';
-// ⚠️ ປ່ຽນຊື່ໄຟລ໌ນີ້ ໃຫ້ຕົງກັບໄຟລ໌ PaymentPage ຂອງທ່ານ (ເຊັ່ນ: payment_page.dart)
 import './payment_page.dart'; 
 
-// 🎯 [FIX 1] ແກ້ໄຂ Type ຂອງ Callback ໃຫ້ສົ່ງຈຳນວນຄົນນຳ
 typedef OnCheckoutCallback = void Function(
  List<CartItem> cart, 
  double totalPrice, 
@@ -110,7 +108,6 @@ class _SingleTicketPageState extends State<SingleTicketPage> {
   });
  }
 
- // --- UI (Build Methods) ---
  @override
  Widget build(BuildContext context) {
   return Container(
@@ -146,7 +143,6 @@ class _SingleTicketPageState extends State<SingleTicketPage> {
   );
  }
 
- // (ฟังก์ชัน _buildInputSection เหมือนเดิม - กดได้ตลอด)
  Widget _buildInputSection() {
   String ticketName = widget.ticket?.ticketName ?? "ກະລຸນາເລືອກປີ້";
   return Column(
@@ -196,7 +192,6 @@ class _SingleTicketPageState extends State<SingleTicketPage> {
   );
  }
 
- // (ฟังก์ชัน _buildCartHeader เหมือนเดิม)
  Widget _buildCartHeader() {
   return Padding(
    padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -249,9 +244,7 @@ class _SingleTicketPageState extends State<SingleTicketPage> {
   );
  }
  
- // 🎯 [FIX 3] ແກ້ໄຂ onPressed ໃຫ້ກວດສອບຄ່າ Adult/Child
  Widget _buildTotalSection() {
-  // ກວດເບິ່ງວ່າຈຳນວນຜູ້ໃຫຍ່ ແລະ ເດັກນ້ອຍລວມກັນມີຄ່າຫຼາຍກວ່າ 0 ບໍ
   final bool canCheckout = _inputAdultQty + _inputChildQty > 0;
 
   return Column(
@@ -285,15 +278,13 @@ class _SingleTicketPageState extends State<SingleTicketPage> {
         fontFamily: 'Phetsarath_OT',
        ),
       ),
-      // ເງື່ອນໄຂການກົດ: ປຸ່ມຈະໃຊ້ງານໄດ້ກໍຕໍ່ເມື່ອ canCheckout ເປັນ true ເທົ່ານັ້ນ
       onPressed: canCheckout 
         ? () {
-          // 🎯 FIX: ສົ່ງຈຳນວນຄົນ (Adult/Child) ອອກໄປນຳ
           widget.onCheckout(
             _cart, _totalPrice, _inputAdultQty, _inputChildQty
           );
          }
-        : null, // ຖ້າ canCheckout ເປັນ false ຈະຕັ້ງຄ່າ onPressed ເປັນ null ເພື່ອ Disable ປຸ່ມ
+        : null, 
       child: const Text('ຊຳລະເງິນ'),
      ),
     ),
