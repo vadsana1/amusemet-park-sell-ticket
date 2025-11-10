@@ -1,28 +1,20 @@
 import "package:http/http.dart" as http;
 import "dart:convert";
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../utils/url_helper.dart';
 // import '../models/new_visitor_ticket.dart'; // ❌ ບໍ່ຈຳເປັນຕ້ອງໃຊ້ NewVisitorTicket ແລ້ວ
 
 class VisitorApi {
-  final String baseUrl;
-
-  VisitorApi({String? baseUrl})
-    : baseUrl = baseUrl ?? dotenv.env['api_url'] ?? '';
-
-  // --- 1. API (A) ສຳລັບ 1 QR (ແກ້ໄຂໃຫ້ຮັບ Map) ---
   Future<Map<String, dynamic>> sellDayPass(
     // 🎯 [ແກ້ໄຂ] ປ່ຽນ Type ຈາກ NewVisitorTicket ເປັນ Map
     Map<String, dynamic> payload,
   ) async {
     try {
+      final baseUrl = await getBaseUrl();
+      final headers = await getHeaders();
       final response = await http.post(
         Uri.parse('$baseUrl/api/visitor/sell-day-pass'),
-        headers: {
-          'Content-Type': 'application/json; charset=UTF-8',
-          'Authorization': 'Bearer ${dotenv.env['token'] ?? ''}',
-          'X-Device-ID': dotenv.env['device_id'] ?? '',
-        },
-        // 🎯 [ແກ້ໄຂ] ໃຊ້ json.encode(payload) ໂດຍກົງ
+        headers: headers,
+
         body: json.encode(payload),
       );
 
@@ -50,13 +42,11 @@ class VisitorApi {
     Map<String, dynamic> payload,
   ) async {
     try {
+      final baseUrl = await getBaseUrl();
+      final headers = await getHeaders();
       final response = await http.post(
         Uri.parse('$baseUrl/api/visitor/sell-day-pass/multiple'),
-        headers: {
-          'Content-Type': 'application/json; charset=UTF-8',
-          'Authorization': 'Bearer ${dotenv.env['token'] ?? ''}',
-          'X-Device-ID': dotenv.env['device_id'] ?? '',
-        },
+        headers: headers,
         body: json.encode(payload),
       );
 
@@ -64,20 +54,21 @@ class VisitorApi {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         if (jsonResponse is Map<String, dynamic>) {
-          
           // 🎯 FIX: CHANGE THE KEY FROM 'data' or 'tickets' to 'purchases'
-          final List<dynamic>? dataList = jsonResponse['purchases'] as List<dynamic>?; 
+          final List<dynamic>? dataList =
+              jsonResponse['purchases'] as List<dynamic>?;
 
           if (dataList != null) {
             return dataList; // ✅ Returns the list of purchase objects
           } else {
             // This happens if the API succeeded but 'purchases' key was missing
             throw Exception(
-                'API (B) returned a Map but is missing the expected "purchases" list.');
+              'API (B) returned a Map but is missing the expected "purchases" list.',
+            );
           }
         } else if (jsonResponse is List) {
           // Fallback if the API returns a raw list
-          return jsonResponse; 
+          return jsonResponse;
         } else {
           throw Exception('API (B) did not return expected data format.');
         }

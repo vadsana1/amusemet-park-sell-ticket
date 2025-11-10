@@ -3,6 +3,7 @@ import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../models/api_ticket_response.dart';
 
 // (ທ່ານອາດຈະຕ້ອງ Import ບໍລິການ Print ຂອງທ່ານຢູ່ບ່ອນນີ້)
@@ -33,6 +34,24 @@ class _ReceiptPageState extends State<ReceiptPage> {
   final currencyFormat = NumberFormat("#,##0", "en_US");
   // (ຕົວຢ່າງ: ປະກາດ service ຖ້າທ່ານມີ)
   // final ReceiptPrinterService _printerService = ReceiptPrinterService();
+
+  final FlutterSecureStorage _storage = const FlutterSecureStorage();
+  String _sellerName = 'Loading...';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSellerName();
+  }
+
+  Future<void> _loadSellerName() async {
+    final userName = await _storage.read(key: 'user_name');
+    if (mounted) {
+      setState(() {
+        _sellerName = userName ?? 'N/A';
+      });
+    }
+  }
 
   // --- Logic ການກົດປຸ່ມ ---
   void _handlePrintAndClose() {
@@ -205,7 +224,7 @@ class _ReceiptPageState extends State<ReceiptPage> {
     );
   }
 
-  /// 🚀 NEW HELPER WIDGET: ຈັດລຽງລາຍການເຄື່ອງຫຼິ້ນໃຫ້ຄືກັບຮູບ (ມີວົງມົນ/checkbox)
+  /// 🚀 NEW HELPER WIDGET: ຈັດລຽງລາຍການເຄື່ອງຫຼິ້ນແບບລາຍການດຽວເພື່ອຄວາມຊັດເຈນ
   Widget _buildRideList(List<String> rideNames) {
     if (rideNames.isEmpty) {
       return const Text(
@@ -214,48 +233,25 @@ class _ReceiptPageState extends State<ReceiptPage> {
       );
     }
 
-    // ຕ້ອງການໃຫ້ແຖວໜຶ່ງມີ 3 ລາຍການ (ຄືກັບໃນຮູບ)
-    const int itemsPerRow = 3;
-    List<Widget> rows = [];
-
-    final displayNames = rideNames;
-
-    for (int i = 0; i < displayNames.length; i += itemsPerRow) {
-      List<Widget> rowItems = [];
-      for (int j = 0; j < itemsPerRow; j++) {
-        int index = i + j;
-        if (index < displayNames.length) {
-          // ສ້າງແຖວຂອງເຄື່ອງຫຼິ້ນ: [ຊື່ເຄື່ອງຫຼິ້ນ O]
-          rowItems.add(
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      displayNames[index],
-                      style: const TextStyle(fontSize: 16),
-                    ),
-                    const SizedBox(width: 4),
-                    const Text('O', style: TextStyle(fontSize: 16)), // ວົງມົນ
-                  ],
-                ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: rideNames.map((rideName) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4.0),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('', style: TextStyle(fontSize: 16)),
+              Expanded(
+                child: Text(rideName, style: const TextStyle(fontSize: 16)),
               ),
-            ),
-          );
-        } else {
-          // ຖ້າບໍ່ມີຂໍ້ມູນໃຫ້ເຕີມແຖວໃຫ້ຄົບ 3 ດ້ວຍ SizedBox
-          rowItems.add(const Expanded(child: SizedBox.shrink()));
-        }
-      }
-      rows.add(
-        Row(crossAxisAlignment: CrossAxisAlignment.start, children: rowItems),
-      );
-    }
-
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: rows);
+              const SizedBox(width: 8),
+              const Text('O', style: TextStyle(fontSize: 16)),
+            ],
+          ),
+        );
+      }).toList(),
+    );
   }
 
   // Helper Widget ສຳລັບສ່ວນຫົວ
@@ -289,21 +285,21 @@ class _ReceiptPageState extends State<ReceiptPage> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    const Text(
-                      'ຜູ້ຂາຍ: vadsana',
-                      style: TextStyle(fontSize: 16),
-                    ), // ⚠️ ທ່ານອາດຈະຕ້ອງດຶງຊື່ຜູ້ຂາຍມາຈາກບ່ອນອື່ນ
+                    Text(
+                      'ຜູ້ຂາຍ: $_sellerName',
+                      style: const TextStyle(fontSize: 16),
+                    ),
                   ],
                 ),
               )
             else
               // ສໍາລັບປີ້ QR Stub, ສະແດງຜູ້ຂາຍກ່ອນ (ໃຊ້ Expanded ດ້ວຍເພື່ອໃຫ້ຈັດຂວາໄດ້)
-              const Expanded(
+              Expanded(
                 child: Padding(
-                  padding: EdgeInsets.only(bottom: 8.0),
+                  padding: const EdgeInsets.only(bottom: 8.0),
                   child: Text(
-                    'ຜູ້ຂາຍ: vadsana',
-                    style: TextStyle(fontSize: 16),
+                    'ຜູ້ຂາຍ: $_sellerName',
+                    style: const TextStyle(fontSize: 16),
                   ),
                 ),
               ),

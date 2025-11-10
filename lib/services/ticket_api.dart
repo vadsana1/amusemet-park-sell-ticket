@@ -1,23 +1,16 @@
 import "package:http/http.dart" as http;
 import "dart:convert";
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../models/ticket.dart';
+import '../utils/url_helper.dart';
 
 class TicketApi {
-  final String baseUrl;
-
-  TicketApi({String? baseUrl})
-    : baseUrl = baseUrl ?? dotenv.env['api_url'] ?? '';
-
   Future<List<Ticket>> fetchTickets() async {
     try {
+      final baseUrl = await getBaseUrl();
+      final headers = await getHeaders();
       final response = await http.get(
         Uri.parse('$baseUrl/api/ticket/list'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${dotenv.env['token'] ?? ''}',
-          'X-Device-ID': dotenv.env['device_id'] ?? '',
-        },
+        headers: headers,
       );
 
       if (response.statusCode == 200) {
