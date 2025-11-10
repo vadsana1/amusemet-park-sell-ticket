@@ -1,26 +1,16 @@
 import "package:http/http.dart" as http;
 import "dart:convert";
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-// 1. Import โมเดลใหม่
 import '../models/payment_method.dart';
+import '../utils/url_helper.dart';
 
 class PaymentApi {
-  final String baseUrl;
-
-  PaymentApi({String? baseUrl})
-    : baseUrl = baseUrl ?? dotenv.env['api_url'] ?? '';
-
-  // 2. เปลี่ยนชื่อฟังก์ชัน และประเภทข้อมูลที่ Return
   Future<List<PaymentMethod>> fetchPaymentMethods() async {
     try {
+      final baseUrl = await getBaseUrl();
+      final headers = await getHeaders();
       final response = await http.get(
         Uri.parse('$baseUrl/api/payment/list'),
-        // ⭐️ FIX: ເພີ່ມ Headers ເພື່ອຢືນຢັນຕົວຕົນ ແລະ Device ID
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${dotenv.env['token'] ?? ''}', // ໃຊ້ token
-          'X-Device-ID': dotenv.env['device_id'] ?? '', // ໃຊ້ device_id
-        },
+        headers: headers,
       );
 
       if (response.statusCode == 200) {

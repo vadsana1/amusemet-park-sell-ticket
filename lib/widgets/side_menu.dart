@@ -28,7 +28,7 @@ class SideMenu extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withAlpha(25),
             spreadRadius: 2,
             blurRadius: 10,
           ),
