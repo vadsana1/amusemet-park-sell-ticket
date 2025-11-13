@@ -4,7 +4,7 @@ import '../models/cart_item.dart';
 import '../models/payment_method.dart';
 import './payment_cash_view.dart';
 import './payment_qr_view.dart';
-import '../widgets/visitor_form_widget.dart'; // 👈 1. Import Widget ໃໝ່
+import '../widgets/visitor_form_widget.dart';
 
 class PaymentPage extends StatefulWidget {
   final List<CartItem> cart;
@@ -32,15 +32,14 @@ class _PaymentPageState extends State<PaymentPage> {
   late TextEditingController _fullNameController;
   late TextEditingController _phoneController;
   String _selectedGender = 'male';
+  String _selectedVisitorType = 'adult'; // 🎯 [ແກ້ໄຂ] ເພີ່ມ State ນີ້
   final NumberFormat _currencyFormat = NumberFormat("#,##0", "en_US");
 
-  // 🚀 NEW HELPER: Logic ເລືອກ CASH ເປັນອັນທໍາອິດ
   void _selectInitialPaymentMethod(List<PaymentMethod> methods) {
     if (methods.isNotEmpty) {
-      // 1. ພະຍາຍາມຊອກຫາ CASH
       final cashMethod = methods.firstWhere(
         (method) => method.code == 'CASH',
-        orElse: () => methods.first, // 2. ຖ້າບໍ່ພົບ, ໃຫ້ເລືອກອັນທໍາອິດ
+        orElse: () => methods.first,
       );
       _selectedPaymentCode = cashMethod.code;
     }
@@ -49,30 +48,24 @@ class _PaymentPageState extends State<PaymentPage> {
   @override
   void initState() {
     super.initState();
-    // 🚀 FIX 1: ໃຊ້ Helper ເພື່ອເລືອກ CASH ກ່ອນ
     _selectInitialPaymentMethod(widget.paymentMethods);
 
     _fullNameController = TextEditingController(text: 'customer');
     _phoneController = TextEditingController(text: '02012345678');
   }
 
-  // ⭐️⭐️⭐️ ADD THIS FUNCTION ⭐️⭐️⭐️
   @override
   void didUpdateWidget(covariant PaymentPage oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    // ກວດສອບວ່າ: paymentMethods ຫາກໍໂຫຼດມາສຳເລັດ
     if (widget.paymentMethods.isNotEmpty &&
         oldWidget.paymentMethods.isEmpty &&
         _selectedPaymentCode == null) {
-      // ສັ່ງ setState ເພື່ອເລືອກ payment method ຕາມເງື່ອນໄຂ (CASH ກ່ອນ)
       setState(() {
-        // 🚀 FIX 2: ໃຊ້ Helper ເພື່ອເລືອກ CASH ກ່ອນເມື່ອ data ມາ
         _selectInitialPaymentMethod(widget.paymentMethods);
       });
     }
   }
-  // ⭐️⭐️⭐️ END OF ADDED FUNCTION ⭐️⭐️⭐️
 
   @override
   void dispose() {
@@ -219,17 +212,11 @@ class _PaymentPageState extends State<PaymentPage> {
     );
   }
 
-  // --- Widget: ສ່ວນຊຳລະເງິນ (ດ້ານຂວາ) ---
   Widget _buildPaymentSection() {
-    // ⭐️ ບ່ອນນີ້ຄືຈຸດທີ່ສະແດງໂຕໝຸນ
     if (_selectedPaymentCode == null) {
-      // ກວດສອບເພີ່ມ: ຖ້າ _selectedPaymentCode ເປັນ null
-      // ແລະ paymentMethods ກໍຍັງບໍ່ມາ (ຍັງວ່າງ) -> ສະແດງໂຕໝຸນ
       if (widget.paymentMethods.isEmpty) {
         return const Center(child: CircularProgressIndicator());
       }
-      // ແຕ່ຖ້າ paymentMethods ມ ແລ້ວ ແຕ່ code ຍັງ null (ເຊັ່ນ error ບາງຢ່າງ)
-      // ໃຫ້ສະແດງ error ແທນທີ່ຈະໝຸນຄ້າງ
       return const Center(
         child: Text('Error: ບໍ່ສາມາດເລືອກຊ່ອງທາງຊຳລະເງິນໄດ້'),
       );
@@ -237,31 +224,31 @@ class _PaymentPageState extends State<PaymentPage> {
 
     return Padding(
       padding: const EdgeInsets.all(24.0),
-      // 🎯 [FIX 3] ປ່ຽນຈາກ Form ເປັນ Column
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // 1. HIDDEN INFO AND PAYMENT HEADER
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 🎯 [FIX 4] ເອີ້ນໃຊ້ VisitorFormWidget ທີ່ແຍກອອກໄປ
               Offstage(
                 child: VisitorFormWidget(
-                  formKey: _formKey, // 👈 ສົ່ງ Key
-                  fullNameController: _fullNameController, // 👈 ສົ່ງ Controller
-                  phoneController: _phoneController, // 👈 ສົ່ງ Controller
-                  initialGender: _selectedGender, // 👈 ສົ່ງຄ່າເລີ່ມຕົ້ນ
+                  formKey: _formKey,
+                  fullNameController: _fullNameController,
+                  phoneController: _phoneController,
+                  initialGender: _selectedGender,
                   onGenderChanged: (newValue) {
-                    // 👈 ຮັບຄ່າ Gender ທີ່ປ່ຽນກັບມາ
                     setState(() {
                       _selectedGender = newValue;
                     });
                   },
+                  initialVisitorType: _selectedVisitorType,
+                  onVisitorTypeChanged: (newType) {
+                    setState(() {
+                      _selectedVisitorType = newType;
+                    });
+                  },
                 ),
               ),
-
-              // PAYMENT HEADER (ຄືເກົ່າ)
               Text(
                 'ຊຳລະເງິນ',
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
@@ -273,8 +260,6 @@ class _PaymentPageState extends State<PaymentPage> {
               const SizedBox(height: 24),
             ],
           ),
-
-          // 2. PAYMENT VIEWS (ຄືເກົ່າ)
           Expanded(
             child: _selectedPaymentCode == 'CASH'
                 ? PaymentCashView(
@@ -286,6 +271,8 @@ class _PaymentPageState extends State<PaymentPage> {
                     visitorGender: _selectedGender,
                     globalAdultQty: widget.adultQty,
                     globalChildQty: widget.childQty,
+                    visitorType:
+                        _selectedVisitorType,
                   )
                 : PaymentQrView(
                     totalPrice: widget.totalPrice,
@@ -296,6 +283,8 @@ class _PaymentPageState extends State<PaymentPage> {
                     visitorGender: _selectedGender,
                     globalAdultQty: widget.adultQty,
                     globalChildQty: widget.childQty,
+                    visitorType:
+                        _selectedVisitorType, 
                   ),
           ),
         ],
@@ -305,8 +294,6 @@ class _PaymentPageState extends State<PaymentPage> {
 
   Widget _buildPaymentTabs() {
     if (widget.paymentMethods.isEmpty) {
-      // ຖ້າ paymentMethods ເປັນ null ຫຼື ວ່າງ, ຈະບໍ່ສະແດງຫຍັງເລີຍ
-      // (ເພາະ _buildPaymentSection ຈະສະແດງໂຕໝຸນແທນ)
       return const SizedBox.shrink();
     }
 

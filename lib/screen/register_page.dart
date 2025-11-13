@@ -162,7 +162,7 @@ class _RegisterPageState extends State<RegisterPage> {
             Text(message),
             const SizedBox(height: 16),
             const Text(
-              'ກະລຸນາຕຶດຕໍ່ແອດມຶນ\n ໂທ: 020 9603 2493',
+              'ກະລຸນາຕຶດຕໍ່ແອດມິນ\n ໂທ: 020 9603 2493',
               style: TextStyle(
                 fontSize: 13,
                 color: Color.fromARGB(255, 0, 0, 0),

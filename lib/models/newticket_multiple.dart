@@ -60,6 +60,8 @@ class NewVisitorTicket {
     this.paymentTransactions,
   });
 
+  // (ສຳຄັນທີ່ສຸດ) toMap() ນີ້ໃຊ້ໄດ້ກັບ API ເສັ້ນດຽວ (sellDayPass)
+  // ແຕ່ສຳລັບເສັ້ນ Multiple (sellDayPassMultiple) ທ່ານໄດ້ແກ້ໄຂແລ້ວໃນ PaymentCashView.dart
   Map<String, dynamic> toMap() {
     final map = {
       'visitor_uid': visitorUid,

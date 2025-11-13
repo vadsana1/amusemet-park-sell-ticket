@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 
 class VisitorFormWidget extends StatefulWidget {
-  // ຮັບ Key, Controllers, ແລະ ຄ່າເລີ່ມຕົ້ນ ຈາກໜ້າແມ່ (PaymentPage)
   final GlobalKey<FormState> formKey;
   final TextEditingController fullNameController;
   final TextEditingController phoneController;
   final String initialGender;
-  // Callback ເພື່ອສົ່ງຄ່າ Gender ທີ່ເລືອກ ກັບຄືນໄປຫາໜ້າແມ່
   final ValueChanged<String> onGenderChanged;
+
+  final String initialVisitorType;
+  final ValueChanged<String> onVisitorTypeChanged;
 
   const VisitorFormWidget({
     super.key,
@@ -16,6 +17,8 @@ class VisitorFormWidget extends StatefulWidget {
     required this.phoneController,
     required this.initialGender,
     required this.onGenderChanged,
+    required this.initialVisitorType, 
+    required this.onVisitorTypeChanged, 
   });
 
   @override
@@ -23,25 +26,43 @@ class VisitorFormWidget extends StatefulWidget {
 }
 
 class _VisitorFormWidgetState extends State<VisitorFormWidget> {
-  // State ຂອງ Gender ຈະຖືກຈັດການຢູ່ບ່ອນນີ້
   late String _selectedGender;
+  late String _selectedVisitorType; 
 
   @override
   void initState() {
     super.initState();
     _selectedGender = widget.initialGender;
+    _selectedVisitorType = widget.initialVisitorType;
+  }
+
+  void _handleVisitorTypeChange(String? value) {
+    if (value != null) {
+      setState(() {
+        _selectedVisitorType = value;
+      });
+      widget.onVisitorTypeChanged(value);
+    }
+  }
+
+  void _handleGenderChange(String? value) {
+    if (value != null) {
+      setState(() {
+        _selectedGender = value;
+      });
+      widget.onGenderChanged(value);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    // ໃຊ້ Form key ຈາກໜ້າແມ່
     return Form(
       key: widget.formKey,
       child: Column(
         children: [
           // --- Full Name ---
           TextFormField(
-            controller: widget.fullNameController, // ໃຊ້ Controller ຈາກໜ້າແມ່
+            controller: widget.fullNameController, 
             decoration: const InputDecoration(
               labelText: 'ຊື່ເຕັມ (ชื่อเต็ม)',
               border: OutlineInputBorder(),
@@ -54,14 +75,12 @@ class _VisitorFormWidgetState extends State<VisitorFormWidget> {
               }
               return null;
             },
-            // ບໍ່ຈຳເປັນຕ້ອງມີ onChanged ທີ່ເອີ້ນ setState(() {})
-            // ເພາະ Controller ຈະອັບເດດຄ່າຂອງມັນເອງ
           ),
           const SizedBox(height: 16),
 
           // --- Phone ---
           TextFormField(
-            controller: widget.phoneController, // ໃຊ້ Controller ຈາກໜ້າແມ່
+            controller: widget.phoneController, 
             decoration: const InputDecoration(
               labelText: 'ເບີໂທ (เบอร์โทร)',
               border: OutlineInputBorder(),
@@ -96,18 +115,30 @@ class _VisitorFormWidgetState extends State<VisitorFormWidget> {
               const Text('ຍິງ (หญิง)'),
             ],
           ),
+
+          Row(
+            children: [
+              const Text(
+                'ປະເພດຜູ້ຊື້ (Purchaser Type):',
+                style: TextStyle(fontSize: 16),
+              ),
+              const SizedBox(width: 8),
+              Radio<String>(
+                value: 'adult',
+                groupValue: _selectedVisitorType,
+                onChanged: _handleVisitorTypeChange,
+              ),
+              const Text('ຜູ້ໃຫຍ່ (Adult)'),
+              Radio<String>(
+                value: 'child',
+                groupValue: _selectedVisitorType,
+                onChanged: _handleVisitorTypeChange,
+              ),
+              const Text('ເດັກ (Child)'),
+            ],
+          ),
         ],
       ),
     );
-  }
-
-  void _handleGenderChange(String? value) {
-    if (value != null) {
-      setState(() {
-        _selectedGender = value;
-      });
-      // ສົ່ງຄ່າ Gender ໃໝ່ ກັບຄືນໄປຫາ PaymentPage
-      widget.onGenderChanged(value);
-    }
   }
 }

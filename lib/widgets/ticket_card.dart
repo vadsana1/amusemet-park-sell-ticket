@@ -44,7 +44,6 @@ class TicketCard extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // --- 1. ส่วนรูป (Placeholder) ---
             Container(
               width: 60,
               height: 60,
@@ -64,13 +63,11 @@ class TicketCard extends StatelessWidget {
             ),
             const SizedBox(width: 12),
 
-            // --- 2. ส่วนข้อความ (ดึงจาก Model) ---
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // 2.1) ชื่อ Ticket (จาก Model)
                   Text(
                     ticket.ticketName,
                     style: TextStyle(
@@ -81,7 +78,6 @@ class TicketCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
 
-                  // 2.2) ราคาผู้ใหญ่
                   Text(
                     "ຜູ້ໃຫຍ່: ${ticket.priceAdult.toStringAsFixed(0)} ກີບ",
                     style: TextStyle(
@@ -91,7 +87,6 @@ class TicketCard extends StatelessWidget {
                     ),
                   ),
 
-                  // 2.3) ราคาเด็ก
                   Text(
                     "ເດັກ: ${ticket.priceChild.toStringAsFixed(0)} ກີບ",
                     style: TextStyle(

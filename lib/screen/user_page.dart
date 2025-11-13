@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'dart:developer';
+import 'dart:convert';
+
 import '../services/close_shift_api.dart';
 import '../services/login_api.dart';
 import 'login_page.dart';
+
+import '../widgets/shift_report_popup.dart';
 
 class UserPage extends StatefulWidget {
   const UserPage({super.key});
@@ -22,7 +27,7 @@ class _UserPageState extends State<UserPage> {
   String _userId = '';
   bool _isClosingShift = false;
 
-  // Mock data - replace with actual data from API
+  // Mock data 
   final int _totalTickets = 10;
   final int _childTickets = 7;
   final int _adultTickets = 3;
@@ -56,21 +61,47 @@ class _UserPageState extends State<UserPage> {
     });
 
     try {
-      final result = await _shiftApi.closeShift(_userId);
+      log('--- ℹ️ Closing Shift ---: Sending staff_id: $_userId');
+
+      final Map<String, dynamic> reportData = await _shiftApi.closeShift(
+        _userId,
+      );
+
+      log(
+        '--- ✅ API Response for Shift Report ---: ${json.encode(reportData)}',
+      );
 
       if (mounted) {
         setState(() {
           _isClosingShift = false;
         });
 
-        if (result['success'] == true) {
-          // Show success and logout
-          _showSuccessDialogAndLogout(result['message'] ?? 'ປິດຮອບສຳເລັດ');
+        final bool? result = await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => ShiftReportPopup(reportData: reportData),
+        );
+
+        if (result == true) {
+          log('--- 🔒 Shift Confirmed ---: Logging out...');
+
+          final navigator = Navigator.of(context);
+          await _loginApi.logout();
+
+          if (mounted) {
+            navigator.pushAndRemoveUntil(
+              MaterialPageRoute(builder: (context) => const LoginPage()),
+              (route) => false,
+            );
+          }
         } else {
-          _showErrorDialog(result['message'] ?? 'ປິດຮອບບໍ່ສຳເລັດ');
+
+          log('--- ↩️ Shift Close Cancelled ---: Staying on UserPage.');
         }
       }
     } catch (e) {
+      log('--- ❌ ERROR in _performCloseShift ---: ${e.toString()}');
+
       if (mounted) {
         setState(() {
           _isClosingShift = false;
@@ -78,40 +109,6 @@ class _UserPageState extends State<UserPage> {
         _showErrorDialog('ເກີດຂໍ້ຜິດພາດ: ${e.toString()}');
       }
     }
-  }
-
-  void _handleCloseShift() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text(
-          'ຢືນຢັນການປິດຮອບ',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        content: const Text(
-          'ທ່ານຕ້ອງການປິດຮອບການຂາຍບໍ່?\nຫຼັງຈາກປິດຮອບ ທ່ານຈະຖືກອອກຈາກລະບົບ',
-        ),
-        actions: [
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _performCloseShift();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF15A19A),
-            ),
-            child: const Text(
-              'ຢືນຢັນປິດຮອບ',
-              style: TextStyle(color: Colors.white),
-            ),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('ຍົກເລີກ'),
-          ),
-        ],
-      ),
-    );
   }
 
   void _showErrorDialog(String message) {
@@ -126,41 +123,6 @@ class _UserPageState extends State<UserPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('ຕົກລົງ'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showSuccessDialogAndLogout(String message) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text(
-          'ສຳເລັດ',
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
-        ),
-        content: Text(message),
-        actions: [
-          ElevatedButton(
-            onPressed: () async {
-              final navigator = Navigator.of(context);
-              navigator.pop();
-              // Logout user
-              await _loginApi.logout();
-              // Navigate to login page
-              if (mounted) {
-                navigator.pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (context) => const LoginPage()),
-                  (route) => false,
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF1A9A8B),
-            ),
             child: const Text('ຕົກລົງ'),
           ),
         ],
@@ -198,7 +160,7 @@ class _UserPageState extends State<UserPage> {
                     ),
                     const SizedBox(height: 40),
 
-                    // Cards Row
+                    // Cards Row 
                     Row(
                       children: [
                         // Total Tickets Card
@@ -242,7 +204,7 @@ class _UserPageState extends State<UserPage> {
                       width: 250,
                       height: 56,
                       child: ElevatedButton.icon(
-                        onPressed: _isClosingShift ? null : _handleCloseShift,
+                        onPressed: _isClosingShift ? null : _performCloseShift,
                         icon: _isClosingShift
                             ? const SizedBox(
                                 width: 20,
@@ -339,7 +301,6 @@ class _UserPageState extends State<UserPage> {
             ),
             const SizedBox(height: 24),
 
-            // Main Value
             Text(
               mainValue,
               style: TextStyle(
@@ -349,7 +310,6 @@ class _UserPageState extends State<UserPage> {
               ),
             ),
 
-            // Details (if provided)
             if (details != null && details.isNotEmpty) ...[
               const SizedBox(height: 24),
               Container(

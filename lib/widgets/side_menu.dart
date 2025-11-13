@@ -21,9 +21,7 @@ class SideMenu extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.teal[400],
         borderRadius: BorderRadius.only(
-          // VVVV ลบบรรทัดนี้ออก VVVV
-          // topRight: Radius.circular(30.0), // <--- ลบออก
-          // ^^^^ ลบบรรทัดนี้ออก ^^^^
+
           bottomRight: Radius.circular(30.0),
         ),
         boxShadow: [
@@ -71,7 +69,6 @@ class SideMenu extends StatelessWidget {
   }
 }
 
-// 4. Widget ย่อยสำหรับปุ่มเมนู
 class MenuItem extends StatelessWidget {
   final String? title;
   final IconData icon;

@@ -5,12 +5,13 @@ import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import 'dart:developer';
 
-// (ກວດສອບ Path ໃຫ້ຖືກຕ້ອງ)
 import '../models/new_visitor_ticket.dart';
 import '../models/cart_item.dart';
 import '../models/api_ticket_response.dart';
 import './receipt_page.dart';
 import '../services/newticket_api.dart';
+import '../services/newticket_multiple_api.dart';
+import '../utils/thousands_formatter.dart'; 
 
 class PaymentCashView extends StatefulWidget {
   final double totalPrice;
@@ -19,9 +20,9 @@ class PaymentCashView extends StatefulWidget {
   final String visitorFullName;
   final String visitorPhone;
   final String visitorGender;
-  // 🎯 ຮັບຈຳນວນຄົນທັງໝົດ
   final int globalAdultQty;
   final int globalChildQty;
+  final String visitorType;
 
   const PaymentCashView({
     super.key,
@@ -33,6 +34,7 @@ class PaymentCashView extends StatefulWidget {
     required this.visitorGender,
     required this.globalAdultQty,
     required this.globalChildQty,
+    required this.visitorType,
   });
 
   @override
@@ -41,9 +43,10 @@ class PaymentCashView extends StatefulWidget {
 
 class _PaymentCashViewState extends State<PaymentCashView> {
   final VisitorApi _visitorApi = VisitorApi();
+  final SellDayPassMultipleApi _visitorApiB = SellDayPassMultipleApi();
+
   bool _isProcessing = false;
 
-  // --- State (ຄືເກົ່າ) ---
   final List<double> _denominations = const [
     1000,
     2000,
@@ -57,7 +60,6 @@ class _PaymentCashViewState extends State<PaymentCashView> {
   final currencyFormat = NumberFormat("#,##0", "en_US");
   final TextEditingController _amountController = TextEditingController();
   double _amountReceived = 0.0;
-  // ---
 
   @override
   void initState() {
@@ -78,7 +80,6 @@ class _PaymentCashViewState extends State<PaymentCashView> {
     return (change < 0) ? 0 : change;
   }
 
-  // --- Logic Functions (ຄືເກົ່າ) ---
   void _updateFromButtons(double denomination, int change) {
     setState(() {
       int currentCount = _cashCounts[denomination] ?? 0;
@@ -109,7 +110,6 @@ class _PaymentCashViewState extends State<PaymentCashView> {
     });
   }
 
-  // --- ຟັງຊັນສຳລັບສ້າງ JSON ແລະ ຢືນຢັນ ---
   Future<void> _handleConfirmPayment() async {
     if (_amountReceived < widget.totalPrice) {
       if (mounted) {
@@ -126,7 +126,6 @@ class _PaymentCashViewState extends State<PaymentCashView> {
     if (_isProcessing) return;
     setState(() => _isProcessing = true);
 
-    // 1. ສ້າງ cashDetailsList (ຄືເກົ່າ)
     final List<CashDetail> cashDetailsList = [];
     _cashCounts.forEach((denomination, quantity) {
       if (quantity > 0) {
@@ -136,59 +135,78 @@ class _PaymentCashViewState extends State<PaymentCashView> {
       }
     });
 
-    // 2. ສ້າງ ticketDetails (Flattening ພ້ອມ gender) (ຄືເກົ່າ)
-    final List<TicketDetail> ticketDetails = [];
-    for (var item in widget.cart) {
-      for (int i = 0; i < item.quantityAdult; i++) {
-        ticketDetails.add(
-          TicketDetail(
-            ticketId: item.ticket.ticketId,
-            visitorType: 'adult',
-            gender: widget.visitorGender,
-          ),
-        );
-      }
-      for (int i = 0; i < item.quantityChild; i++) {
-        ticketDetails.add(
-          TicketDetail(
-            ticketId: item.ticket.ticketId,
-            visitorType: 'child',
-            gender: widget.visitorGender,
-          ),
-        );
-      }
-    }
-
-   
-    // 3. ນັບຈຳນວນຄົນທັງໝົດ (ແກ້ໄຂ)
     int totalPeople = widget.globalAdultQty + widget.globalChildQty;
     if (totalPeople == 0) {
       setState(() => _isProcessing = false);
       return;
     }
 
-    // --- 4. ສ້າງ Payload ໃຫ້ຕົງກັບ API ---
     try {
       log(
         '--- 💸 ສົ່ງ API (${widget.paymentMethodCode}) - ($totalPeople ຄົນ) ---',
       );
       List<ApiTicketResponse> apiResponses = [];
 
-      // ສ້າງ Object ຂໍ້ມູນຜູ້ຊື້ແຍກ
       final Map<String, dynamic> visitorDetails = {
         "visitor_uid": const Uuid().v4(),
         "full_name": widget.visitorFullName,
         "phone": widget.visitorPhone,
         "gender": widget.visitorGender,
+        "visitor_type": widget.visitorType,
       };
 
-      // ສ້າງ Base Payload (ບໍ່ມີຂໍ້ມູນຜູ້ຊື້)
-      final List<Map<String, dynamic>> ticketsPayload = ticketDetails
-          .map((ticket) => ticket.toMap())
-          .toList();
       final List<Map<String, dynamic>> cashPayload = cashDetailsList
           .map((cash) => cash.toMap())
           .toList();
+
+      List<Map<String, dynamic>> ticketsPayload;
+      final List<TicketDetail> ticketDetailsForResponseMapping = [];
+
+      // --- Logic Block (ticketsPayload) ---
+      if (totalPeople == 1) {
+        log('--- ℹ️ Building Payload (API A - 1 object per Ride) ---');
+
+        String visitorType = (widget.globalAdultQty == 1) ? 'adult' : 'child';
+
+        ticketsPayload = []; 
+        for (var item in widget.cart) { 
+          var detail = TicketDetail(
+            ticketId: item.ticket.ticketId,
+            visitorType: visitorType,
+            gender: widget.visitorGender,
+          );
+          ticketsPayload.add(detail.toMap()); 
+          ticketDetailsForResponseMapping.add(detail);
+        }
+
+      } else {
+        log('--- ℹ️ Building Payload (API B - 1 object per Person) ---');
+
+        final List<int> allTicketIdsInCart = widget.cart
+            .map((item) => item.ticket.ticketId)
+            .toSet()
+            .toList();
+        
+        ticketsPayload = []; 
+
+        for (int i = 0; i < widget.globalAdultQty; i++) {
+          ticketsPayload.add({
+            "visitor_type": "adult",
+            "gender": widget.visitorGender,
+            "ticket_id": allTicketIdsInCart, // 👈 ticket_id ເປັນ Array
+          });
+          ticketDetailsForResponseMapping.add(TicketDetail(ticketId: 0, visitorType: 'adult', gender: ''));
+        }
+        for (int i = 0; i < widget.globalChildQty; i++) {
+          ticketsPayload.add({
+            "visitor_type": "child",
+            "gender": widget.visitorGender,
+            "ticket_id": allTicketIdsInCart, 
+          });
+          ticketDetailsForResponseMapping.add(TicketDetail(ticketId: 0, visitorType: 'child', gender: ''));
+        }
+      }
+
 
       final Map<String, dynamic> basePayload = {
         "tickets": ticketsPayload,
@@ -199,50 +217,74 @@ class _PaymentCashViewState extends State<PaymentCashView> {
         "payment_transactions": cashPayload,
       };
 
-      // 🎯 [LOGIC ທີ່ຖືກຕ້ອງຢູ່ບ່ອນນີ້] ຕ້ອງກວດສອບຈຳນວນຄົນ
       if (totalPeople == 1) {
-        // --- (A) 1 ປີ້: ໃຊ້ໂຄງສ້າງ FLAT ---
         final Map<String, dynamic> flatPayload = {
           ...basePayload,
-          ...visitorDetails, // <-- ແຍກຂໍ້ມູນຜູ້ຊື້ມາໄວ້ລະດັບນອກ
+          ...visitorDetails,
         };
         log('Payload 1-Ticket (Flat) Sent: ${json.encode(flatPayload)}');
+        log('Calling API (A): sellDayPass (ຕົວເດີມ)');
 
-        log('Calling API (A): sellDayPass');
         final Map<String, dynamic> responseMap = await _visitorApi.sellDayPass(
           flatPayload,
         );
+        log('--- ✅ Full API (A) Response ---: ${json.encode(responseMap)}');
 
-        // ສົ່ງຈຳນວນຄົນໄປໃຫ້ FromMap
+        final List<dynamic>? purchasesList =
+            responseMap['purchases'] as List<dynamic>?;
+        if (purchasesList == null || purchasesList.isEmpty) {
+          throw Exception('API (A) did not return "purchases" list.');
+        }
+        
+        final Map<String, dynamic> purchaseMap = purchasesList.first;
+
         apiResponses.add(
           ApiTicketResponse.fromMap(
-            responseMap,
+            purchaseMap: purchaseMap,
+            rootMap: responseMap,
             globalAdultQty: widget.globalAdultQty,
             globalChildQty: widget.globalChildQty,
           ),
         );
       } else {
-        // --- (B) ຫຼາຍປີ້: ໃຊ້ໂຄງສ້າງ NESTED ---
         final Map<String, dynamic> nestedPayload = {
           ...basePayload,
-          "visitor": visitorDetails, // <-- ຂໍ້ມູນຜູ້ຊື້ຖືກຊ້ອນຢູ່ໃນ "visitor"
+          "visitor": visitorDetails,
         };
+        
         log('Payload Multiple (Nested) Sent: ${json.encode(nestedPayload)}');
+        log('Calling API (B): sellDayPassMultiple (ຕົວໃໝ່)');
 
-        log('Calling API (B): sellDayPassMultiple');
-        final List<dynamic> responseList = await _visitorApi
+        final Map<String, dynamic> fullResponseMap = await _visitorApiB
             .sellDayPassMultiple(nestedPayload);
+        
+        log('--- ✅ Full API (B) Response ---: ${json.encode(fullResponseMap)}');
 
-        // Loop ຜ່ານ List ທີ່ໄດ້ຮັບຈາກ "purchases"
-        apiResponses = responseList.map((map) {
-          final responseData = map as Map<String, dynamic>;
-          // API (B) ສົ່ງ `ticket_type` ມາ, ບໍ່ແມ່ນ `globalQty`
-          return ApiTicketResponse.fromMap(
-            responseData,
-            globalAdultQty: responseData['ticket_type'] == 'adult' ? 1 : 0,
-            globalChildQty: responseData['ticket_type'] == 'child' ? 1 : 0,
+        final List<dynamic> responseList =
+            fullResponseMap['purchases'] as List<dynamic>;
+
+        if (responseList.length != ticketDetailsForResponseMapping.length) {
+           throw Exception(
+            "API response count (${responseList.length}) does not match sent payload count (${ticketDetailsForResponseMapping.length})."
           );
-        }).toList();
+        }
+
+        apiResponses = [];
+        for (int i = 0; i < responseList.length; i++) {
+          
+          final responseData = responseList[i] as Map<String, dynamic>; 
+          final sentData = ticketDetailsForResponseMapping[i];
+          final String visitorType = sentData.visitorType; 
+
+          apiResponses.add(
+            ApiTicketResponse.fromMap(
+              purchaseMap: responseData, 
+              rootMap: fullResponseMap, 
+              globalAdultQty: visitorType == 'adult' ? 1 : 0,
+              globalChildQty: visitorType == 'child' ? 1 : 0,
+            ),
+          );
+        }
       }
 
       log('--- ✅ API Response (ແທ້) ---');
@@ -250,22 +292,16 @@ class _PaymentCashViewState extends State<PaymentCashView> {
 
       if (!mounted) return;
 
-
       final bool? receiptResult = await Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => ReceiptPage(
-            responses: apiResponses,
-          
-          ),
+          builder: (context) => ReceiptPage(responses: apiResponses),
         ),
       );
 
       if (receiptResult == true) {
         if (mounted) {
-          Navigator.of(
-            context,
-          ).pop(true); 
+          Navigator.of(context).pop(true);
         }
       }
     } catch (e) {
@@ -293,7 +329,6 @@ class _PaymentCashViewState extends State<PaymentCashView> {
       }
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -503,28 +538,6 @@ class _PaymentCashViewState extends State<PaymentCashView> {
           ),
         ],
       ),
-    );
-  }
-}
-
-class ThousandsFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    if (newValue.text.isEmpty) {
-      return newValue.copyWith(text: '');
-    }
-    final intValue = int.tryParse(newValue.text.replaceAll(',', ''));
-    if (intValue == null) {
-      return oldValue;
-    }
-    final formatter = NumberFormat('#,##0', 'en_US');
-    String newText = formatter.format(intValue);
-    return newValue.copyWith(
-      text: newText,
-      selection: TextSelection.collapsed(offset: newText.length),
     );
   }
 }
