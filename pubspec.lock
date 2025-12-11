@@ -256,6 +256,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "4.5.4"
+  imin_printer:
+    dependency: "direct main"
+    description:
+      name: imin_printer
+      sha256: "7d0e2df5c6260ebeb1a4b4755caa23691632004802550b5072dc17d5276e8e7f"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.6.14"
   intl:
     dependency: "direct main"
     description:
@@ -304,6 +312,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "5.1.1"
+  logger:
+    dependency: transitive
+    description:
+      name: logger
+      sha256: "7ad7215c15420a102ec687bb320a7312afd449bac63bfb1c60d9787c27b9767f"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.4.0"
   matcher:
     dependency: transitive
     description:
