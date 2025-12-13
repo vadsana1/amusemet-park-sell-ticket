@@ -1,6 +1,7 @@
 // ไฟล์: user_manual_screen.dart
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:http/http.dart' as http;
 
 class UserManualScreen extends StatefulWidget {
   const UserManualScreen({super.key});
@@ -22,9 +23,22 @@ class _UserManualScreenState extends State<UserManualScreen> {
 
   Future<void> _initializeWebView() async {
     try {
-      // Load HTML from GitHub raw URL
+      // Download HTML content from GitHub
       const String manualUrl =
           'https://raw.githubusercontent.com/vadsana1/amusemet-park-sell-ticket/main/manual/index.html';
+
+      final response = await http.get(Uri.parse(manualUrl));
+
+      if (response.statusCode != 200) {
+        throw Exception('Failed to load manual: ${response.statusCode}');
+      }
+
+      // Replace relative image paths with absolute GitHub URLs
+      final baseImageUrl =
+          'https://raw.githubusercontent.com/vadsana1/amusemet-park-sell-ticket/main/manual/';
+      String htmlContent = response.body;
+      htmlContent =
+          htmlContent.replaceAll('src="images/', 'src="${baseImageUrl}images/');
 
       _controller = WebViewController()
         ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -44,7 +58,7 @@ class _UserManualScreenState extends State<UserManualScreen> {
             },
           ),
         )
-        ..loadRequest(Uri.parse(manualUrl));
+        ..loadHtmlString(htmlContent, baseUrl: manualUrl);
 
       setState(() {});
     } catch (e) {
