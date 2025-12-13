@@ -7,12 +7,14 @@ class PackageTicketPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: Colors.white,
-      child: Center(
-        child: Text(
-          'ແພັກເກັດ',
-          style: TextStyle(fontSize: 24, color: Colors.black),
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Center(
+          child: Text(
+            'ແພັກເກັດ',
+            style: TextStyle(fontSize: 24, color: Colors.black),
+          ),
         ),
       ),
     );

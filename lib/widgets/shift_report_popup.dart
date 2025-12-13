@@ -1,188 +1,312 @@
+// [ FILE: lib/widgets/shift_report_popup.dart ]
+
+import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+// ⚠️ ต้อง Import ReceiptPrinterService สำหรับ iMin
+import '../services/receipt_printer_service.dart';
+
+// เนื่องจาก ShiftSummaryScreen ส่ง Map มาที่นี่ เราจึงใช้ Map
+// และลบ Class ShiftReport Example ที่ซ้ำซ้อนออกไป
 class ShiftReportPopup extends StatelessWidget {
-  final Map<String, dynamic> reportData;
-  final NumberFormat _currencyFormat = NumberFormat("#,##0", "en_US");
+ final Map<String, dynamic> reportData; // 🟢 แก้ไข: รับเป็น Map<String, dynamic>
+ final NumberFormat _currencyFormat = NumberFormat("#,##0", "en_US");
+ final ReceiptPrinterService _iminService = ReceiptPrinterService();
 
-  ShiftReportPopup({super.key, required this.reportData});
+ ShiftReportPopup({super.key, required this.reportData});
 
-  // Helper 
-  double _safeParseDouble(dynamic value) {
-    if (value == null) return 0.0;
-    return double.tryParse(value.toString().replaceAll(',', '')) ?? 0.0;
-  }
+ // --- Helpers แปลงข้อมูลปลอดภัย ---
+ double _safeParseDouble(dynamic value) {
+  if (value == null) return 0.0;
+  // แปลง String ที่มีลูกน้ำ (เช่น "1,940,000.00") ให้เป็น double
+  return double.tryParse(value.toString().replaceAll(',', '')) ?? 0.0;
+ }
 
-  Future<void> _showConfirmDialog(BuildContext context) async {
-    final NavigatorState navigator = Navigator.of(context);
+ int _safeParseInt(dynamic value) {
+  if (value == null) return 0;
+  // แปลงเป็น int และจัดการกรณีทศนิยมถ้ามี
+  return int.tryParse(value.toString().replaceAll(',', '').split('.').first) ?? 0;
+ }
+ // ----------------
 
-    final bool? confirmed = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false, 
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          title: const Text('ຢືນຢັນການປິດຮອບ'),
-          content: const Text('ທ່ານແນ່ໃຈບໍ່ວ່າຕ້ອງການຢືນຢັນການປິດຮອບນີ້?'),
-          actions: [
-            // cancel button
-            TextButton(
-              onPressed: () =>
-                  Navigator.of(dialogContext).pop(false),
-              child: const Text('ຍົກເລີກ'),
-            ),
-            // confirm button
-            FilledButton(
-              onPressed: () =>
-                  Navigator.of(dialogContext).pop(true), 
-              style: FilledButton.styleFrom(
-                backgroundColor: Colors.red[700],
-              ),
-              child: const Text('ຢືນຢັນ'),
-            ),
-          ],
-        );
-      },
+ // --- ฟังก์ชันพิมพ์ผ่าน iMin Printer ---
+ Future<void> _printReport(BuildContext context) async {
+  try {
+   // 1. ดึงข้อมูลจาก Map
+   final Map<String, dynamic> user = reportData['user'] ?? {};
+   final Map<String, dynamic> sales = reportData['sales'] ?? {};
+   final Map<String, dynamic> visitors = reportData['visitors'] ?? {};
+   final List<dynamic> payments = reportData['payments'] ?? [];
+   final Map<String, dynamic> rides = reportData['rides'] ?? {};
+   final String closedAt = reportData['closed_at'] ?? '-';
+
+   int totalVisitors = _safeParseInt(visitors['total_adults']) +
+     _safeParseInt(visitors['total_children']);
+
+   // 2. เตรียมข้อมูลสำหรับพิมพ์
+   final String staffName = user['staff_name']?.toString() ?? '-';
+   final String totalSales =
+     _currencyFormat.format(_safeParseDouble(sales['total_sales']));
+   final String totalTickets = '${sales['total_tickets'] ?? 0}';
+   final String adultSales =
+     _currencyFormat.format(_safeParseDouble(sales['adult_sales']));
+   final String childSales =
+     _currencyFormat.format(_safeParseDouble(sales['child_sales']));
+
+   // 3. สร้างรายการ payments เป็น List<Map<String, String>>
+   final List<Map<String, String>> paymentList = payments.map((p) {
+    final pMap = p as Map<String, dynamic>;
+    return {
+     'method': pMap['method']?.toString() ?? 'Unknown',
+     'total': _currencyFormat.format(_safeParseDouble(pMap['total'])),
+          'code': pMap['code']?.toString() ?? '',
+    };
+   }).toList();
+
+   // 4. เรียกใช้ iMin printer service
+      // 🚨 หมายเหตุ: ต้องแก้ไข ReceiptPrinterService.dart ให้รองรับพารามิเตอร์ทั้งหมดนี้
+   await _iminService.printShiftReport(
+    shiftId: user['staff_id']?.toString() ?? '-',
+    cashierName: staffName,
+    startDate: closedAt,
+    endDate: closedAt,
+    totalRevenue: totalSales,
+    totalTickets: totalTickets,
+    adultSales: adultSales, 
+    childSales: childSales,
+    totalVisitors: totalVisitors.toString(),
+    adultVisitors: '${visitors['total_adults'] ?? 0}',
+    childVisitors: '${visitors['total_children'] ?? 0}',
+    payments: paymentList,
+    totalPlays: '${rides['total_plays'] ?? 0}',
+    adultsPlayed: '${rides['adults_played'] ?? 0}',
+    childrenPlayed: '${rides['children_played'] ?? 0}',
+   );
+
+   if (context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+     const SnackBar(
+      content: Text('ສົ່ງຄຳສັ່ງພິມໄປຫາເຄື່ອງ iMin ແລ້ວ'),
+      backgroundColor: Colors.green,
+     ),
     );
-
-    if (confirmed == true) {
-      navigator.pop(true); 
-    }
+   }
+  } catch (e) {
+   log("Error printing Shift Report: $e");
+   if (context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+     SnackBar(
+      content: Text('ເກີດຂໍ້ຜິດພາດ: $e'),
+      backgroundColor: Colors.red,
+     ),
+    );
+   }
   }
+ }
 
-  @override
-  Widget build(BuildContext context) {
-    // ດຶງຂໍ້ມູນຈາກ Map
-    final Map<String, dynamic> user =
-        reportData['user'] as Map<String, dynamic>;
-    final Map<String, dynamic> sales =
-        reportData['sales'] as Map<String, dynamic>;
-    final List<dynamic> payments = reportData['payments'] as List<dynamic>;
-    final Map<String, dynamic> rides =
-        reportData['rides'] as Map<String, dynamic>;
-    final String closedAt = reportData['closed_at'] as String;
-
+ Future<void> _showConfirmDialog(BuildContext context) async {
+  final NavigatorState navigator = Navigator.of(context);
+  final bool? confirmed = await showDialog<bool>(
+   context: context,
+   barrierDismissible: false,
+   builder: (BuildContext dialogContext) {
     return AlertDialog(
-      title: const Text('📋 ສະຫຼຸບຍອດ (Shift Report)'),
-      content: SingleChildScrollView(
-        child: SizedBox(
-          width: 400, 
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildSectionHeader('👤 ຂໍ້ມູນຜູ້ປິດຮອບ'),
-              _buildInfoRow('ພະນັກງານ:', user['staff_name'].toString()),
-              _buildInfoRow('ເວລາປິດຮອບ:', closedAt),
-              const Divider(height: 24),
-
-              _buildSectionHeader('💰 ຍອດຂາຍ'),
-              _buildInfoRow(
-                'ຍອດຂາຍລວມ (Total Sales):',
-                '${_currencyFormat.format(_safeParseDouble(sales['total_sales']))} ກີບ',
-                isTotal: true,
-              ),
-              _buildInfoRow(
-                'ຈຳນວນປີ້ (Total Tickets):',
-                '${sales['total_tickets']} ໃບ',
-              ),
-              const SizedBox(height: 8),
-              _buildInfoRow(
-                '  - ຍອດຜູ້ໃຫຍ່:',
-                '${_currencyFormat.format(_safeParseDouble(sales['adult_sales']))} ກີບ',
-              ),
-              _buildInfoRow(
-                '  - ຍອດເດັກນ້ອຍ:',
-                '${_currencyFormat.format(_safeParseDouble(sales['child_sales']))} ກີບ',
-              ),
-              const Divider(height: 24),
-
-              _buildSectionHeader('💳 ປະເພດການຈ່າຍເງິນ'),
-              ...payments.map((payment) {
-                final Map<String, dynamic> pMap =
-                    payment as Map<String, dynamic>;
-                return _buildInfoRow(
-                  '  - ${pMap['method']}:',
-                  '${_currencyFormat.format(_safeParseDouble(pMap['total']))} ກີບ',
-                );
-              }).toList(),
-              const Divider(height: 24),
-
-              _buildSectionHeader('🎠 ຂໍ້ມູນເຄື່ອງຫຼິ້ນ'),
-              _buildInfoRow(
-                'ຈຳນວນຫຼິ້ນທັງໝົດ:',
-                '${rides['total_plays']} ຄັ້ງ',
-              ),
-              _buildInfoRow(
-                '  - ຜູ້ໃຫຍ່ຫຼິ້ນ:',
-                '${rides['adults_played']} ຄັ້ງ',
-              ),
-              _buildInfoRow(
-                '  - ເດັກນ້ອຍຫຼິ້ນ:',
-                '${rides['children_played']} ຄັ້ງ',
-              ),
-            ],
-          ),
-        ),
+     title: const Text('ຢືນຢັນການປິດຮອບ'),
+     content: const Text('ທ່ານແນ່ໃຈບໍ່ວ່າຕ້ອງການຢືນຢັນການປິດຮອບນີ້?'),
+     actions: [
+      TextButton(
+       onPressed: () => Navigator.of(dialogContext).pop(false),
+       child: const Text(
+        'ຍົກເລີກ',
+        style: TextStyle(color: Colors.grey),
+       ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context)
-              .pop(),
-          child: const Text('ກັບຄືນ'),
-        ),
+      FilledButton(
+       onPressed: () => Navigator.of(dialogContext).pop(true),
+       style: FilledButton.styleFrom(backgroundColor: Colors.red[700]),
+       child: const Text('ຢືນຢັນ'),
+      ),
+     ],
+    );
+   },
+  );
 
-        ElevatedButton(
-          onPressed: () {
-            _showConfirmDialog(context);
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor:
-                const Color(0xFF1A9A8B), 
-            foregroundColor: Colors.white,
-          ),
-          child: const Text('ຢືນຢັນປິດກະ'),
-        ),
+  if (confirmed == true) {
+   navigator.pop(true);
+  }
+ }
+
+ @override
+ Widget build(BuildContext context) {
+  // 1. ดึงข้อมูลมาแสดงบนหน้าจอ
+  final Map<String, dynamic> user = reportData['user'] ?? {};
+  final Map<String, dynamic> sales = reportData['sales'] ?? {};
+  final Map<String, dynamic> visitors =
+    reportData['visitors'] ?? {}; // ดึง Visitors
+  final List<dynamic> payments = reportData['payments'] ?? [];
+  final Map<String, dynamic> rides = reportData['rides'] ?? {};
+  final String closedAt = reportData['closed_at'] ?? '-';
+
+  // คำนวณยอดรวมผู้เข้าชม
+  int totalVisitors = _safeParseInt(visitors['total_adults']) +
+    _safeParseInt(visitors['total_children']);
+
+  return AlertDialog(
+   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+   // Title Bar มีปุ่ม Print
+   title: Row(
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+     const Row(
+      children: [
+       Icon(Icons.assignment_turned_in, color: Color(0xFF1A9A8B)),
+       SizedBox(width: 10),
+       Text('ສະຫຼຸບຍອດ (Report)', style: TextStyle(fontSize: 18)),
       ],
-    );
-  }
+     ),
+     IconButton(
+      icon: const Icon(Icons.print, color: Colors.blue),
+      tooltip: 'Print Report',
+      onPressed: () => _printReport(context),
+     ),
+    ],
+   ),
+   content: SingleChildScrollView(
+    child: SizedBox(
+     width: 400,
+     child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+       _buildSectionHeader('👤 ຂໍ້ມູນຜູ້ປິດຮອບ'),
+       _buildInfoRow('ພະນັກງານ:', user['staff_name']?.toString() ?? '-'),
+       _buildInfoRow('ເວລາປິດຮອບ:', closedAt),
+       const Divider(height: 24),
 
+       _buildSectionHeader('💰 ຍອດຂາຍ'),
+       _buildInfoRow(
+        'ຍອດຂາຍລວມ:',
+        '${_currencyFormat.format(_safeParseDouble(sales['total_sales']))} ກີບ',
+        isTotal: true,
+       ),
+       _buildInfoRow(
+        ' - ຍອດຜູ້ໃຫຍ່:',
+        '${_currencyFormat.format(_safeParseDouble(sales['adult_sales']))} ກີບ',
+       ),
+       _buildInfoRow(
+        ' - ຍອດເດັກນ້ອຍ:',
+        '${_currencyFormat.format(_safeParseDouble(sales['child_sales']))} ກີບ',
+       ),
+       const Divider(height: 24),
 
-  Widget _buildSectionHeader(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
-      child: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
-          color: Color(0xFF1A9A8B), 
-        ),
+       // --- Visitors Section (ส่วนที่เพิ่มใหม่บนหน้าจอ) ---
+       _buildSectionHeader('👥 ຈຳນວນປີ້ທີ່ຂາຍ'),
+       _buildInfoRow('ລວມທັງໝົດ:', '$totalVisitors ປີ້', isTotal: true),
+       _buildInfoRow(
+        ' - ຜູ້ໃຫຍ່:',
+        '${visitors['total_adults'] ?? 0} ປີ້',
+       ),
+       _buildInfoRow(
+        ' - ເດັກນ້ອຍ:',
+        '${visitors['total_children'] ?? 0} ປີ້',
+       ),
+       const Divider(height: 24),
+
+       // ---------------------------------------------
+       if (payments.isNotEmpty) ...[
+        _buildSectionHeader('💳 ປະເພດການຈ່າຍເງິນ'),
+        ...payments.map((payment) {
+         final pMap = payment as Map<String, dynamic>;
+         return _buildInfoRow(
+          ' - ${pMap['method'] ?? 'Unknown'}:',
+          '${_currencyFormat.format(_safeParseDouble(pMap['total']))} ກີບ',
+         );
+        }),
+        const Divider(height: 24),
+       ],
+
+       _buildSectionHeader('🎠 ຂໍ້ມູນເຄື່ອງຫຼິ້ນ'),
+       _buildInfoRow(
+        'ຈຳນວນຫຼິ້ນທັງໝົດ:',
+        '${rides['total_plays'] ?? 0} ຄັ້ງ',
+       ),
+       _buildInfoRow(
+        ' - ຜູ້ໃຫຍ່ຫຼິ້ນ:',
+        '${rides['adults_played'] ?? 0} ຄັ້ງ',
+       ),
+       _buildInfoRow(
+        ' - ເດັກນ້ອຍຫຼິ້ນ:',
+        '${rides['children_played'] ?? 0} ຄັ້ງ',
+       ),
+      ],
+     ),
+    ),
+   ),
+   actions: [
+    // ปุ่ม Print ด้านล่าง
+    TextButton.icon(
+     onPressed: () => _printReport(context),
+     icon: const Icon(Icons.print, size: 18),
+     label: const Text('Print'),
+     style: TextButton.styleFrom(foregroundColor: Colors.blue[700]),
+    ),
+    const SizedBox(width: 8),
+    TextButton(
+     onPressed: () => Navigator.of(context).pop(false),
+     child: const Text('ກັບຄືນ', style: TextStyle(color: Colors.grey)),
+    ),
+    ElevatedButton(
+     onPressed: () => _showConfirmDialog(context),
+     style: ElevatedButton.styleFrom(
+      backgroundColor: const Color(0xFF1A9A8B),
+      foregroundColor: Colors.white,
+      shape: RoundedRectangleBorder(
+       borderRadius: BorderRadius.circular(8),
       ),
-    );
-  }
+     ),
+     child: const Text('ຢືນຢັນປິດກະ'),
+    ),
+   ],
+  );
+ }
 
-  Widget _buildInfoRow(String label, String value, {bool isTotal = false}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
-            ),
-          ),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
-              color: isTotal ? Colors.red[700] : Colors.black87,
-            ),
-          ),
-        ],
+ Widget _buildSectionHeader(String title) {
+  return Padding(
+   padding: const EdgeInsets.only(bottom: 8.0),
+   child: Text(
+    title,
+    style: const TextStyle(
+     fontSize: 16,
+     fontWeight: FontWeight.bold,
+     color: Color(0xFF1A9A8B),
+    ),
+   ),
+  );
+ }
+
+ Widget _buildInfoRow(String label, String value, {bool isTotal = false}) {
+  return Padding(
+   padding: const EdgeInsets.symmetric(vertical: 4.0),
+   child: Row(
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+     Text(
+      label,
+      style: TextStyle(
+       fontSize: 14,
+       fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
       ),
-    );
-  }
+     ),
+     Text(
+      value,
+      style: TextStyle(
+       fontSize: 14,
+       fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
+       color: isTotal ? Colors.red[700] : Colors.black87,
+      ),
+     ),
+    ],
+   ),
+  );
+ }
 }

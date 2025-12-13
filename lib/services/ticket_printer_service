@@ -1,0 +1,90 @@
+// import 'dart:convert';
+// import 'dart:developer';
+// import 'package:intl/intl.dart';
+// import '../models/api_ticket_response.dart';
+// import 'sticker_printer_service.dart';
+
+// class TicketPrinterService {
+//   // เรียกใช้ Instance จากไฟล์ที่ 1 (StickerPrinterService)
+//   final StickerPrinterService _printer = StickerPrinterService.instance;
+
+//   Future<void> printTickets(
+//     List<ApiTicketResponse> tickets,
+//     String sellerName,
+//   ) async {
+//     try {
+//       log("🖨️ กำลังเริ่มกระบวนการพิมพ์สติกเกอร์...");
+
+//       // ✅ [แก้ไข] ใช้ isConnectedNotifier.value แทน Getter isConnected
+//       // ซึ่งเป็นวิธีที่ถูกต้องที่สุดในการดึงค่าจาก ValueNotifier
+//       if (!_printer.isConnectedNotifier.value) {
+//         log("⚠️ Printer not connected. (กรุณาเชื่อมต่อในหน้าตั้งค่าก่อน)");
+//         return; // หยุดการทำงานถ้าเครื่องพิมพ์ไม่เชื่อมต่อ
+//       }
+
+//       // 1. กำหนดชื่อร้าน (Header มุมขวาบน)
+//       const String shopNameHeader = "Laodoove";
+
+//       for (var ticket in tickets) {
+//         // --- A. เตรียมข้อมูล วันที่ และ เวลา (แยกกัน) ---
+//         DateTime parsedDate;
+//         try {
+//           // แปลงวันที่จาก String เป็น DateTime
+//           parsedDate = DateTime.parse(ticket.purchaseDate);
+//         } catch (e) {
+//           parsedDate = DateTime.now();
+//         }
+
+//         // แยกวันที่: 27/11/2025
+//         String dateText = DateFormat('dd/MM/yyyy').format(parsedDate);
+//         // แยกเวลา: 13:36
+//         String timeText = DateFormat('HH:mm').format(parsedDate);
+
+//         // --- B. เตรียมข้อมูลประเภทตั๋ว (ปรับเป็นอังกฤษเพื่อกัน Error Font) ---
+//         String typeText;
+//         String countText;
+
+//         if (ticket.adultCount > 0) {
+//           // ใช้ภาษาอังกฤษเพื่อให้ TSC พิมพ์ออกแน่นอน
+//           typeText = "ADULT";
+//           countText = "${ticket.adultCount}";
+//         } else {
+//           typeText = "CHILD";
+//           countText = "${ticket.childCount > 0 ? ticket.childCount : 1}";
+//         }
+
+//         // ประกอบร่าง: "ADULT x 1 Qty"
+//         String fullTypeString = "$typeText x $countText Qty";
+
+//         // --- C. เตรียมรายการเครื่องเล่น ---
+//         List<String> rides = ticket.rideNames;
+
+//         // --- D. ข้อมูล QR Code ---
+//         Map<String, String> qrDataMap = {
+//           "purchase": ticket.purchaseId.toString(),
+//           "visitor": ticket.visitorUid,
+//         };
+//         String qrJsonString = jsonEncode(qrDataMap);
+
+//         // --- E. ส่งคำสั่งไปที่ไฟล์ StickerPrinterService ---
+//         await _printer.printTicket(
+//           ticketId: ticket.purchaseId.toString(),
+//           shopName: shopNameHeader,
+//           date: dateText,
+//           time: timeText,
+//           ticketType: fullTypeString,
+//           rideList: rides,
+//           qrData: qrJsonString,
+//         );
+
+//         // หน่วงเวลา 0.6 วินาที ระหว่างใบ เพื่อป้องกัน Printer Buffer เต็ม
+//         await Future.delayed(const Duration(milliseconds: 600));
+//       }
+
+//       log("✅ พิมพ์ครบทุกใบเรียบร้อยแล้ว");
+//     } catch (e) {
+//       log("❌ Error printing stickers: $e");
+//       // rethrow เพื่อให้ UI รู้ว่า error (ถ้าจำเป็น)
+//     }
+//   }
+// }

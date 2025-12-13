@@ -2,19 +2,19 @@ import 'dart:developer';
 
 // --- Helper Functions ---
 
-/// ແປງ String ທີ່​ມີ (,) ເປັນ double ຢ່າງ​ປອດ​ໄພ
 double _safeParseDouble(dynamic value) {
   if (value == null) return 0.0;
+  // แปลง String ที่มีลูกน้ำ (เช่น "1,940,000.00") ให้เป็น double
   return double.tryParse(value.toString().replaceAll(',', '')) ?? 0.0;
 }
 
-/// ແປງ​ຄ່າ​ເປັນ int ຢ່າງ​ປອດ​ໄພ
 int _safeParseInt(dynamic value) {
   if (value == null) return 0;
-  return int.tryParse(value.toString()) ?? 0;
+  // แปลงเป็น int และจัดการกรณีทศนิยมถ้ามี
+  if (value is double) return value.toInt();
+  return int.tryParse(value.toString().split('.').first) ?? 0;
 }
 
-/// ແປງ​ຄ່າ​ເປັນ String ຢ່າງ​ປອດ​ໄພ
 String _safeParseString(dynamic value) {
   if (value == null) return '';
   return value.toString();
@@ -25,8 +25,9 @@ String _safeParseString(dynamic value) {
 class ShiftReport {
   final ReportUser user;
   final ReportSales sales;
-  final List<ReportPayment> payments;
+  final List<ReportPayment> payments; // เก็บรายการ Bank Transfer, Cash ที่นี่
   final ReportRides rides;
+  final ReportVisitors visitors;
   final String closedAt;
 
   ShiftReport({
@@ -34,6 +35,7 @@ class ShiftReport {
     required this.sales,
     required this.payments,
     required this.rides,
+    required this.visitors,
     required this.closedAt,
   });
 
@@ -42,26 +44,29 @@ class ShiftReport {
       return ShiftReport(
         user: ReportUser.fromMap(map['user'] ?? {}),
         sales: ReportSales.fromMap(map['sales'] ?? {}),
+
+        // Map Payments List
         payments: (map['payments'] as List<dynamic>? ?? [])
             .map((payment) => ReportPayment.fromMap(payment))
             .toList(),
+
         rides: ReportRides.fromMap(map['rides'] ?? {}),
+        visitors: ReportVisitors.fromMap(map['visitors'] ?? {}),
         closedAt: _safeParseString(map['closed_at']),
       );
     } catch (e) {
       log('Error parsing ShiftReport: $e');
-      // ສົ່ງຄ່າ فاضي (empty) ກັບຄືນຖ້າ parsing ລົ້ມເຫຼວ
       return ShiftReport.empty();
     }
   }
 
-  // ຟັງຊັນສຳລັບສ້າງ object ວ່າງເປົ່າ (ກັນ Error)
   factory ShiftReport.empty() {
     return ShiftReport(
       user: ReportUser.empty(),
       sales: ReportSales.empty(),
       payments: [],
       rides: ReportRides.empty(),
+      visitors: ReportVisitors.empty(),
       closedAt: '',
     );
   }
@@ -125,6 +130,7 @@ class ReportSales {
   }
 }
 
+// Model สำหรับ Payment (Bank, Cash)
 class ReportPayment {
   final String method;
   final String code;
@@ -140,6 +146,7 @@ class ReportPayment {
     return ReportPayment(
       method: _safeParseString(map['method']),
       code: _safeParseString(map['code']),
+      // ใช้ _safeParseDouble เพื่อรองรับค่า "1,940,000.00"
       total: _safeParseDouble(map['total']),
     );
   }
@@ -166,5 +173,34 @@ class ReportRides {
 
   factory ReportRides.empty() {
     return ReportRides(totalPlays: 0, adultsPlayed: 0, childrenPlayed: 0);
+  }
+}
+
+class ReportVisitors {
+  final int totalAdults;
+  final int totalChildren;
+  final int totalVisitors;
+
+  ReportVisitors({
+    required this.totalAdults,
+    required this.totalChildren,
+    required this.totalVisitors,
+  });
+
+  factory ReportVisitors.fromMap(Map<String, dynamic> map) {
+    int adults = _safeParseInt(map['total_adults']);
+    int children = _safeParseInt(map['total_children']);
+
+    return ReportVisitors(
+      totalAdults: adults,
+      totalChildren: children,
+      totalVisitors: map['total_visitors'] != null
+          ? _safeParseInt(map['total_visitors'])
+          : (adults + children),
+    );
+  }
+
+  factory ReportVisitors.empty() {
+    return ReportVisitors(totalAdults: 0, totalChildren: 0, totalVisitors: 0);
   }
 }

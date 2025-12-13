@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../models/ticket.dart';
 import '../models/cart_item.dart';
-import 'package:intl/intl.dart';
 import '../models/payment_method.dart';
 import '../widgets/quantity_stepper.dart';
-import './payment_page.dart';
 
 typedef OnCheckoutCallback =
     void Function(
@@ -19,6 +18,8 @@ class SingleTicketPage extends StatefulWidget {
   final List<PaymentMethod> paymentMethods;
   final void Function(Ticket ticket) onTicketSelected;
   final OnCheckoutCallback onCheckout;
+  // [เพิ่ม] รับ callback เพื่อส่งตะกร้าออกไป
+  final Function(List<CartItem>) onCartChanged;
 
   const SingleTicketPage({
     super.key,
@@ -26,6 +27,7 @@ class SingleTicketPage extends StatefulWidget {
     required this.paymentMethods,
     required this.onTicketSelected,
     required this.onCheckout,
+    required this.onCartChanged,
   });
 
   @override
@@ -45,9 +47,19 @@ class _SingleTicketPageState extends State<SingleTicketPage> {
       _inputChildQty = 0;
       _totalPrice = 0.0;
     });
+    _notifyCartChange();
   }
 
-  // --- LOGIC (Logic ล่าสุด: Global Stepper, Add-only) ---
+  // [เพิ่ม] ฟังก์ชันส่งค่าตะกร้าออกแบบปลอดภัย (แก้จอแดง)
+  void _notifyCartChange() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        widget.onCartChanged(List.from(_cart));
+      }
+    });
+  }
+
+  // --- LOGIC เดิมของคุณ (Global Stepper, Add-only) ---
   @override
   void didUpdateWidget(SingleTicketPage oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -55,6 +67,7 @@ class _SingleTicketPageState extends State<SingleTicketPage> {
       setState(() {
         var existingItem = _findItemInCart(widget.ticket!);
         if (existingItem == null) {
+          // Logic เดิม: ถ้าไม่มีให้ Add ใหม่
           _cart.add(
             CartItem(
               ticket: widget.ticket!,
@@ -65,6 +78,8 @@ class _SingleTicketPageState extends State<SingleTicketPage> {
           _calculateTotal();
         }
       });
+      // เรียก notify หลัง update เสร็จ (แก้จอแดงด้วย addPostFrameCallback ข้างใน)
+      _notifyCartChange();
     }
   }
 
@@ -92,6 +107,7 @@ class _SingleTicketPageState extends State<SingleTicketPage> {
       _cart.remove(item);
       _calculateTotal();
     });
+    _notifyCartChange(); // แจ้งออกไปเมื่อลบ
   }
 
   void _updateCart(String type, int change) {
@@ -108,6 +124,7 @@ class _SingleTicketPageState extends State<SingleTicketPage> {
       _cart.removeWhere((item) => item.totalQuantity <= 0);
       _calculateTotal();
     });
+    _notifyCartChange(); // แจ้งออกไปเมื่อแก้จำนวน
   }
 
   @override
@@ -152,7 +169,7 @@ class _SingleTicketPageState extends State<SingleTicketPage> {
       children: [
         Text(
           'ຊື່ເຄື່ອງຫຼິ້ນ: $ticketName',
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.bold,
             color: Colors.black,
@@ -194,71 +211,71 @@ class _SingleTicketPageState extends State<SingleTicketPage> {
     );
   }
 
+  // Header และ CartRow ใช้โค้ดเดิมของคุณได้เลย
   Widget _buildCartHeader() {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Row(
-        children: [
-          const Expanded(
+        children: const [
+          Expanded(
             flex: 1,
             child: Text(
               "ລ/ດ",
-              style: TextStyle(fontWeight: FontWeight.bold),
               textAlign: TextAlign.center,
+              style: TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
-          const Expanded(
+          Expanded(
             flex: 2,
             child: Text(
               "ຈຳນວນ",
-              style: TextStyle(fontWeight: FontWeight.bold),
               textAlign: TextAlign.center,
+              style: TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
-          const Expanded(
+          Expanded(
             flex: 5,
             child: Text(
               "ຊື່",
-              style: TextStyle(fontWeight: FontWeight.bold),
               textAlign: TextAlign.center,
+              style: TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
           Expanded(
             flex: 2,
             child: Text(
               "ເດັກ",
-              style: TextStyle(fontWeight: FontWeight.bold),
               textAlign: TextAlign.center,
+              style: TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
           Expanded(
             flex: 2,
             child: Text(
               "ຜູ້ໃຫຍ່",
-              style: TextStyle(fontWeight: FontWeight.bold),
               textAlign: TextAlign.center,
+              style: TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
           Expanded(
             flex: 3,
             child: Text(
               "ລາຄາລວມ",
-              style: TextStyle(fontWeight: FontWeight.bold),
               textAlign: TextAlign.right,
+              style: TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
-          const SizedBox(width: 40),
+          SizedBox(width: 40),
         ],
       ),
     );
   }
 
-  // (ฟังก์ชัน _buildCartItemRow เหมือนเดิม - กดแก้ไขไม่ได้)
   Widget _buildCartItemRow(CartItem item, int index) {
     final NumberFormat currencyFormat = NumberFormat("#,##0", "en_US");
     final bool isSelected = widget.ticket?.ticketId == item.ticket.ticketId;
     return InkWell(
-      onTap: null, // 🎯 ปิดการกดแก้ไข
+      onTap: null,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
         color: isSelected ? Colors.teal.withAlpha(26) : Colors.transparent,
@@ -305,9 +322,7 @@ class _SingleTicketPageState extends State<SingleTicketPage> {
                 iconSize: 20,
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
-                onPressed: () {
-                  _removeItemFromCart(item);
-                },
+                onPressed: () => _removeItemFromCart(item),
               ),
             ),
           ],
@@ -317,8 +332,8 @@ class _SingleTicketPageState extends State<SingleTicketPage> {
   }
 
   Widget _buildTotalSection() {
-    final bool canCheckout = _inputAdultQty + _inputChildQty > 0;
     final NumberFormat currencyFormat = NumberFormat("#,##0", "en_US");
+    final bool canCheckout = _inputAdultQty + _inputChildQty > 0;
 
     return Column(
       children: [
@@ -346,10 +361,6 @@ class _SingleTicketPageState extends State<SingleTicketPage> {
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF1A9A8B),
               padding: const EdgeInsets.symmetric(vertical: 16),
-              textStyle: const TextStyle(
-                fontSize: 18,
-                fontFamily: 'Phetsarath_OT',
-              ),
             ),
             onPressed: canCheckout
                 ? () {

@@ -46,19 +46,26 @@ class SideMenu extends StatelessWidget {
 
           SizedBox(height: 30.0),
 
-          MenuItem(
-            title: "ປີ້ແພັກເກັດ",
-            icon: Icons.airplane_ticket_outlined,
-            isSelected: selectedIndex == 1,
-            onTap: () => onMenuItemTapped(1),
-          ),
+          // MenuItem(
+          //   title: "ປີ້ແພັກເກັດ",
+          //   icon: Icons.airplane_ticket_outlined,
+          //   isSelected: selectedIndex == 1,
+          //   onTap: () => onMenuItemTapped(1),
+          // ),
 
           Spacer(),
 
           MenuItem(
-            icon: Icons.person,
+            icon: Icons.lock_clock,
             isSelected: selectedIndex == 2,
             onTap: () => onMenuItemTapped(2),
+            isProfile: true,
+          ),
+
+          MenuItem(
+            icon: Icons.person,
+            isSelected: selectedIndex == 3,
+            onTap: () => onMenuItemTapped(3),
             isProfile: true,
           ),
 

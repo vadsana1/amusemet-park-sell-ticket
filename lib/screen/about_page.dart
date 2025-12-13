@@ -130,13 +130,13 @@ class _AboutPageState extends State<AboutPage> {
                 icon: Icons.phone_outlined,
                 title: 'ຕິດຕໍ່',
                 description:
-                    'ສຳລັບການຊ່ວຍເຫຼຶອ ແລະ ຄຳຖາມ\nກະລຸນາຕິດຕໍ່ທີມງານ\nໂທ: 20 9603 2493\nອີເມວ: niky@xangkhamtransport.com',
+                    'ສຳລັບການຊ່ວຍເຫຼຶອ ແລະ ຄຳຖາມ\nກະລຸນາຕິດຕໍ່ທີມງານ\nໂທ: 20 5838 7836\nອີເມວ: vadsana@xangkhamtransport.com',
               ),
               const SizedBox(height: 20),
               // WhatsApp Button
               InkWell(
                 onTap: () async {
-                  final phoneNumber = '8562096032493';
+                  final phoneNumber = '8562058387836'; 
                   final whatsappSchemeUrl = Uri.parse(
                     'whatsapp://send?phone=$phoneNumber',
                   );

@@ -4,6 +4,7 @@ class Ticket {
   final double priceChild;
   final String type;
   final int ticketId;
+  final String? imageUrl; 
 
   const Ticket({
     required this.ticketName,
@@ -11,7 +12,7 @@ class Ticket {
     required this.priceChild,
     required this.type,
     required this.ticketId,
-
+    this.imageUrl, 
   });
 
   factory Ticket.fromMap(Map<String, dynamic> map) {
@@ -21,6 +22,8 @@ class Ticket {
       priceChild: double.parse(map['price_child'].toString()),
       type: map['type'] as String,
       ticketId: map['ticket_id'] as int,
+ 
+      imageUrl: map['image_url'] as String?,
     );
   }
 }

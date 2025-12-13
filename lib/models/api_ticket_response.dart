@@ -2,24 +2,18 @@
 import 'dart:developer'; // ເພື່ອໃຊ້ log
 
 // ======================================================
-// ▼▼▼ Helper Functions (ຄວນແຍກໄປໄຟລ໌ utils/safe_parser.dart) ▼▼▼
+// ▼▼▼ Helper Functions ▼▼▼
 // ======================================================
 int _safeParseInt(dynamic value, String fieldName) {
   if (value == null) {
-    log('Warning: API returned null for "$fieldName". Using 0.');
     return 0;
   }
-
-  // 🎯 [ເພີ່ມ] ລຶບເຄື່ອງໝາຍ (,) ອອກ​ກ່ອນ​ທີ່​ຈະ​ແປງ
   final String stringValue = value.toString().replaceAll(',', '');
-
-  // ແປງ String ທີ່​ບໍ່​ມີ (,) ເປັນ int
   return int.tryParse(stringValue) ?? 0;
 }
 
 String _safeParseString(dynamic value, String fieldName) {
   if (value == null) {
-    log('Warning: API returned null for "$fieldName". Using empty string.');
     return '';
   }
   return value.toString();
@@ -27,7 +21,6 @@ String _safeParseString(dynamic value, String fieldName) {
 
 bool _safeParseBool(dynamic value, String fieldName) {
   if (value == null) {
-    log('Warning: API returned null for "$fieldName". Using false.');
     return false;
   }
   if (value is bool) {
@@ -36,7 +29,7 @@ bool _safeParseBool(dynamic value, String fieldName) {
   return value.toString().toLowerCase() == 'true' || value.toString() == '1';
 }
 // ======================================================
-// ▲▲▲ Helper Functions (ສິ້ນສຸດ) ▲▲▲
+// ▲▲▲ Helper Functions ▲▲▲
 // ======================================================
 
 class ApiTicketResponse {
@@ -53,6 +46,12 @@ class ApiTicketResponse {
   final int adultCount;
   final int childCount;
 
+  // 🟢 [1] เพิ่มตัวแปรวันที่
+  final String purchaseDate;
+
+  // 🟢 [4] เพิ่มตัวแปร qrData สำหรับส่งไปพิมพ์ (Format JSON)
+  final String qrData;
+
   ApiTicketResponse({
     required this.purchaseId,
     required this.visitorUid,
@@ -63,21 +62,19 @@ class ApiTicketResponse {
     required this.rideNames,
     required this.adultCount,
     required this.childCount,
+    required this.purchaseDate,
+    // 🟢 [5] เพิ่มใน Constructor
+    required this.qrData,
   });
 
-  // 🎯 [ແກ້ໄຂ] ປ່ຽນ Signature ຂອງ fromMap
   factory ApiTicketResponse.fromMap({
-    // 1. Map ຂອງ Object ທີ່ຢູ່ໃນ "purchases" list
     required Map<String, dynamic> purchaseMap,
-    // 2. Map ຂອງ JSON Response ໂຕເຕັມ (Root)
     required Map<String, dynamic> rootMap,
-    // 3. ຈຳນວນຄົນ (ທີ່ເຮົາສົ່ງເຂົ້າไปเอง)
     required int globalAdultQty,
     required int globalChildQty,
   }) {
     List<String> extractedRideNames = [];
 
-    // ສ່ວນນີ້ຖືກຕ້ອງ (ອ່ານ 'tickets' ຈາກ purchaseMap)
     try {
       if (purchaseMap['tickets'] != null && purchaseMap['tickets'] is List) {
         var purchasedRideDataList = (purchaseMap['tickets'] as List)
@@ -100,22 +97,38 @@ class ApiTicketResponse {
       log('Error parsing nested "tickets" array: $e');
     }
 
+    // --- เตรียมข้อมูล ID และ Visitor UID ก่อน ---
+    int pId = _safeParseInt(purchaseMap['purchase_id'], 'purchase_id');
+    String vUid = _safeParseString(purchaseMap['visitor_uid'], 'visitor_uid');
+
+    // 🟢 [6] สร้าง qrData ตามรูปแบบ JSON ที่ต้องการ: {"purchase":857,"visitor":"..."}
+    // เราสร้างขึ้นมาใหม่เลยเพื่อให้ข้อมูลตรงกับ ID และ UID ของตั๋วใบนี้แน่นอน
+    String generatedQrData = '{"purchase":$pId,"visitor":"$vUid"}';
+
     return ApiTicketResponse(
-      // --- ຂໍ້ມູນຈາກ purchaseMap ---
-      purchaseId: _safeParseInt(purchaseMap['purchase_id'], 'purchase_id'),
-      visitorUid: _safeParseString(purchaseMap['visitor_uid'], 'visitor_uid'),
+      // --- ข้อมูลจาก purchaseMap ---
+      purchaseId: pId,
+      visitorUid: vUid,
       qrCode: _safeParseString(purchaseMap['qr_code'], 'qr_code'),
 
-      // ⭐️ [ແກ້ໄຂ] ດຶງຄ່າຈາກ rootMap
-      // ນີ້ຈະແກ້ໄຂ Warning "API returned null"
+      // --- ข้อมูลจาก rootMap ---
       amountDue: _safeParseInt(rootMap['amount_due'], 'amount_due'),
       amountPaid: _safeParseInt(rootMap['amount_paid'], 'amount_paid'),
       changeAmount: _safeParseInt(rootMap['change_amount'], 'change_amount'),
 
-      // --- ຂໍ້ມູນທີ່ເຮົາ Enrich ใส่ ---
+      // [3] ดึงวันที่
+      purchaseDate: _safeParseString(
+        rootMap['created_at'] ?? rootMap['date'] ?? DateTime.now().toString(),
+        'purchase_date',
+      ),
+
+      // --- ข้อมูลที่ Enrich ใส่ ---
       rideNames: extractedRideNames,
       adultCount: globalAdultQty,
       childCount: globalChildQty,
+
+      // 🟢 [7] ใส่ค่า qrData ที่สร้างไว้
+      qrData: generatedQrData,
     );
   }
 }

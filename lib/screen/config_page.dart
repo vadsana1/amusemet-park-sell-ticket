@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 
 class ConfigPage extends StatefulWidget {
   const ConfigPage({super.key});
@@ -83,6 +85,37 @@ class _ConfigPageState extends State<ConfigPage> {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  Future<void> _scanQrConfig() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => _QrScannerPage(
+          onScanned: (String data) {
+            try {
+              final Map<String, dynamic> json = jsonDecode(data);
+              final String? baseUrl = json['base_url']?.toString();
+              final String? token = json['token']?.toString();
+
+              if (baseUrl != null && token != null) {
+                setState(() {
+                  _baseUrlController.text = baseUrl;
+                  _tokenController.text = token;
+                });
+                _showMessage('ສະແກນສຳເລັດ! ກະລຸນາກົດບັນທຶກເພື່ອບັນທຶກຂໍ້ມູນ',
+                    isError: false);
+              } else {
+                _showMessage('QR Code ບໍ່ຖືກຕ້ອງ: ຂາດຂໍ້ມູນ base_url ຫຼື token',
+                    isError: true);
+              }
+            } catch (e) {
+              _showMessage('ບໍ່ສາມາດອ່ານ QR Code ໄດ້: ຮູບແບບ JSON ບໍ່ຖືກຕ້ອງ',
+                  isError: true);
+            }
+          },
+        ),
+      ),
+    );
   }
 
   Future<bool?> _showConfirmDialog() {
@@ -358,7 +391,36 @@ class _ConfigPageState extends State<ConfigPage> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 40),
+                      const SizedBox(height: 30),
+
+                      // Scan QR Button
+                      ElevatedButton(
+                        onPressed: _scanQrConfig,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.qr_code_scanner,
+                                color: Color(0xFF15A19A)),
+                            const SizedBox(width: 8),
+                            Text(
+                              'ສະແກນ QR ເພື່ອຕັ້ງຄ່າ',
+                              style: GoogleFonts.notoSansLao(
+                                color: const Color(0xFF15A19A),
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
 
                       // Save Button
                       ElevatedButton(
@@ -421,6 +483,105 @@ class _ConfigPageState extends State<ConfigPage> {
                   ),
                 ),
               ),
+      ),
+    );
+  }
+}
+
+/// QR Scanner Page for scanning config JSON
+class _QrScannerPage extends StatefulWidget {
+  final Function(String) onScanned;
+
+  const _QrScannerPage({required this.onScanned});
+
+  @override
+  State<_QrScannerPage> createState() => _QrScannerPageState();
+}
+
+class _QrScannerPageState extends State<_QrScannerPage> {
+  final MobileScannerController _scannerController = MobileScannerController();
+  bool _hasScanned = false;
+
+  @override
+  void dispose() {
+    _scannerController.dispose();
+    super.dispose();
+  }
+
+  void _handleBarcode(BarcodeCapture capture) {
+    if (_hasScanned) return;
+
+    final List<Barcode> barcodes = capture.barcodes;
+    if (barcodes.isNotEmpty && barcodes.first.rawValue != null) {
+      _hasScanned = true;
+      final String data = barcodes.first.rawValue!;
+      Navigator.of(context).pop();
+      widget.onScanned(data);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF15A19A),
+        title: Text(
+          'ສະແກນ QR Config',
+          style: GoogleFonts.notoSansLao(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
+      body: Stack(
+        children: [
+          MobileScanner(
+            controller: _scannerController,
+            onDetect: _handleBarcode,
+          ),
+          // Overlay with instructions
+          Positioned(
+            bottom: 100,
+            left: 20,
+            right: 20,
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.black.withAlpha(180),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.qr_code, color: Colors.white, size: 40),
+                  const SizedBox(height: 8),
+                  Text(
+                    'ສະແກນ QR Code ທີ່ມີຮູບແບບ JSON',
+                    style: GoogleFonts.notoSansLao(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '{"base_url": "...", "token": "..."}',
+                    style: GoogleFonts.robotoMono(
+                      color: Colors.white70,
+                      fontSize: 12,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -4,13 +4,11 @@ import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import 'dart:developer';
 
-import '../models/new_visitor_ticket.dart'; 
 import '../models/cart_item.dart';
 import '../models/api_ticket_response.dart';
 import './receipt_page.dart';
 
-import '../services/newticket_api.dart';
-import '../services/newticket_multiple_api.dart'; 
+import '../services/newticket_multiple_api.dart';
 
 class PaymentQrView extends StatefulWidget {
   final double totalPrice;
@@ -41,9 +39,9 @@ class PaymentQrView extends StatefulWidget {
 }
 
 class _PaymentQrViewState extends State<PaymentQrView> {
-  final VisitorApi _visitorApi = VisitorApi();
-  final SellDayPassMultipleApi _visitorApiB =
-      SellDayPassMultipleApi(); 
+  // ใช้ API B (Multiple) เป็นหลัก เพื่อรองรับ Nested Visitor และ Array Ticket ID
+  final SellDayPassMultipleApi _visitorApiMultiple = SellDayPassMultipleApi();
+
   bool _isProcessing = false;
   final currencyFormat = NumberFormat("#,##0", "en_US");
 
@@ -73,28 +71,6 @@ class _PaymentQrViewState extends State<PaymentQrView> {
     if (_isProcessing) return;
     setState(() => _isProcessing = true);
 
-    final List<TicketDetail> ticketDetails = [];
-    for (var item in widget.cart) {
-      for (int i = 0; i < item.quantityAdult; i++) {
-        ticketDetails.add(
-          TicketDetail(
-            ticketId: item.ticket.ticketId,
-            visitorType: 'adult',
-            gender: widget.visitorGender,
-          ),
-        );
-      }
-      for (int i = 0; i < item.quantityChild; i++) {
-        ticketDetails.add(
-          TicketDetail(
-            ticketId: item.ticket.ticketId,
-            visitorType: 'child',
-            gender: widget.visitorGender,
-          ),
-        );
-      }
-    }
-
     int totalPeople = widget.globalAdultQty + widget.globalChildQty;
     if (totalPeople == 0) {
       setState(() => _isProcessing = false);
@@ -103,11 +79,11 @@ class _PaymentQrViewState extends State<PaymentQrView> {
 
     try {
       log(
-        '--- 💸 ສົ່ງ API (${widget.paymentMethodCode}) - ($totalPeople ຄົນ) ---',
+        '--- 💸 กำลังส่งข้อมูล (QR: ${widget.paymentMethodCode}) - ($totalPeople คน) ---',
       );
-      List<ApiTicketResponse> apiResponses = [];
 
-      final Map<String, dynamic> visitorDetails = {
+      // 1. เตรียม Visitor Object
+      final Map<String, dynamic> visitorData = {
         "visitor_uid": const Uuid().v4(),
         "full_name": widget.visitorFullName,
         "phone": widget.visitorPhone,
@@ -115,87 +91,104 @@ class _PaymentQrViewState extends State<PaymentQrView> {
         "visitor_type": widget.visitorType,
       };
 
-      final String referenceId = _referenceIdController.text;
-      final String bankBillNumber = _bankBillNumberController.text;
+      // 2. เตรียม Ticket Payload (ใช้ Logic เดียวกับหน้า Cash)
+      // รวบ ID ทุกใบในตะกร้า เป็น List เดียวกัน [5, 2]
+      final List<int> allTicketIdsInCart =
+          widget.cart.map((item) => item.ticket.ticketId).toSet().toList();
 
-      List<Map<String, dynamic>> ticketsPayload;
-      if (totalPeople == 1) {
-        log('ສ້າງ Payload (A) ແບບ int');
-        ticketsPayload = ticketDetails.map((ticket) => ticket.toMap()).toList();
-      } else {
-        log('ສ້າງ Payload (B) ແບບ Array');
-        ticketsPayload = ticketDetails.map((ticket) {
-          final map = ticket.toMap();
-          map['ticket_id'] = [map['ticket_id']];
-          return map;
-        }).toList();
+      List<Map<String, dynamic>> ticketsPayload = [];
+      // สร้างตัวช่วย Mapping เพื่อเช็ค Type ตอน Response กลับมา
+      final List<String> expectedTypes = [];
+
+      // วนลูปสร้างตั๋วให้ผู้ใหญ่ทุกคน (ทุกคนได้ Bundle ID เหมือนกัน)
+      for (int i = 0; i < widget.globalAdultQty; i++) {
+        ticketsPayload.add({
+          "visitor_type": "adult",
+          "gender": widget.visitorGender,
+          "ticket_id": allTicketIdsInCart, // ส่งเป็น Array [5, 2]
+        });
+        expectedTypes.add('adult');
       }
 
-      final Map<String, dynamic> basePayload = {
+      // วนลูปสร้างตั๋วให้เด็กทุกคน
+      for (int i = 0; i < widget.globalChildQty; i++) {
+        ticketsPayload.add({
+          "visitor_type": "child",
+          "gender": widget.visitorGender,
+          "ticket_id": allTicketIdsInCart, // ส่งเป็น Array [5, 2]
+        });
+        expectedTypes.add('child');
+      }
+
+      // 3. เตรียม Payment Transactions (ส่วนของ QR)
+      List<Map<String, String>> paymentTransactions = [];
+
+      if (_referenceIdController.text.isNotEmpty) {
+        paymentTransactions.add({
+          "transaction_ref1": _referenceIdController.text,
+        });
+      }
+
+      if (_bankBillNumberController.text.isNotEmpty) {
+        paymentTransactions.add({
+          "transaction_ref2": _bankBillNumberController.text,
+        });
+      }
+
+      // 4. รวมร่าง JSON Payload
+      final Map<String, dynamic> fullPayload = {
+        "visitor": visitorData,
         "tickets": ticketsPayload,
         "payment_method": widget.paymentMethodCode,
         "amount_due": widget.totalPrice.toInt(),
-        "amount_paid": widget.totalPrice.toInt(), 
-        "change_amount": 0, 
-        "payment_transactions": [], 
-        "transaction_ref_id": referenceId,
-        "bank_bill_number": bankBillNumber,
+        "amount_paid": widget.totalPrice.toInt(),
+        "change_amount": 0,
+        "payment_transactions": paymentTransactions,
       };
 
-      if (totalPeople == 1) {
-        final Map<String, dynamic> flatPayload = {
-          ...basePayload,
-          ...visitorDetails,
-        };
-        log('Payload 1-QR (API A) Sent: ${json.encode(flatPayload)}');
-        log('Calling API (A): sellDayPass');
+      log('FINAL PAYLOAD (QR): ${json.encode(fullPayload)}');
 
-        final Map<String, dynamic> responseMap = await _visitorApi.sellDayPass(
-          flatPayload,
+      // 5. ส่ง API
+      final Map<String, dynamic> fullResponseMap =
+          await _visitorApiMultiple.sellDayPassMultiple(fullPayload);
+
+      // 6. จัดการ Response
+      final List<dynamic> responseList =
+          fullResponseMap['purchases'] as List<dynamic>;
+
+      // เช็คว่าจำนวนที่ได้กลับมา ตรงกับที่ส่งไปไหม
+      if (responseList.length != expectedTypes.length) {
+        log(
+          "Warning: Response count (${responseList.length}) != Request count (${expectedTypes.length})",
         );
+      }
 
-        final List<dynamic>? purchasesList =
-            responseMap['purchases'] as List<dynamic>?;
-        if (purchasesList == null || purchasesList.isEmpty) {
-          throw Exception('API (A) did not return "purchases" list.');
+      List<ApiTicketResponse> apiResponses = [];
+      for (int i = 0; i < responseList.length; i++) {
+        final responseData = responseList[i] as Map<String, dynamic>;
+
+        // ใช้ Type จากที่เรา Loop ไว้ หรือถ้า API แม่นยำใช้จาก API ก็ได้
+        // ในที่นี้ใช้ logic เดียวกับ Cash คือ map กลับมาตาม index
+        String type = (i < expectedTypes.length)
+            ? expectedTypes[i]
+            : responseData['ticket_type'] ?? 'adult';
+
+        // Double Check จาก API Response
+        if (responseData.containsKey('ticket_type')) {
+          type = responseData['ticket_type'];
         }
-        final Map<String, dynamic> purchaseMap = purchasesList.first;
 
         apiResponses.add(
           ApiTicketResponse.fromMap(
-            purchaseMap: purchaseMap, 
-            rootMap: responseMap, 
-            globalAdultQty: widget.globalAdultQty,
-            globalChildQty: widget.globalChildQty,
+            purchaseMap: responseData,
+            rootMap: fullResponseMap,
+            globalAdultQty: type == 'adult' ? 1 : 0,
+            globalChildQty: type == 'child' ? 1 : 0,
           ),
         );
-      } else {
-        final Map<String, dynamic> nestedPayload = {
-          ...basePayload,
-          "visitor": visitorDetails,
-        };
-        log('Payload Multiple-QR (API B) Sent: ${json.encode(nestedPayload)}');
-        log('Calling API (B): sellDayPassMultiple');
-
-        final Map<String, dynamic> fullResponseMap = await _visitorApiB
-            .sellDayPassMultiple(nestedPayload);
-
-        final List<dynamic> responseList =
-            fullResponseMap['purchases'] as List<dynamic>;
-
-        apiResponses = responseList.map((map) {
-          final responseData = map as Map<String, dynamic>;
-          return ApiTicketResponse.fromMap(
-            purchaseMap: responseData, 
-            rootMap: fullResponseMap, 
-            globalAdultQty: responseData['ticket_type'] == 'adult' ? 1 : 0,
-            globalChildQty: responseData['ticket_type'] == 'child' ? 1 : 0,
-          );
-        }).toList();
       }
 
-      log('--- ✅ API Response (ແທ້) ---');
-      log('ໄດ້ QR ທັງໝົດ: ${apiResponses.length} ໃບ');
+      log('--- ✅ สำเร็จ (QR) ได้ตั๋ว: ${apiResponses.length} ใบ ---');
 
       if (!mounted) return;
 
@@ -220,11 +213,11 @@ class _PaymentQrViewState extends State<PaymentQrView> {
         builder: (ctx) => AlertDialog(
           title: const Text('Error'),
           content: Text(
-            'ເກີດຂໍ້ຜິດພາດ: ${e.toString().split("Exception: ").last}',
+            'เกิดข้อผิดพลาด: ${e.toString().split("Exception: ").last}',
           ),
           actions: [
             TextButton(
-              child: const Text('ຕົກລົງ'),
+              child: const Text('ตกลง'),
               onPressed: () => Navigator.of(ctx).pop(),
             ),
           ],
@@ -237,7 +230,7 @@ class _PaymentQrViewState extends State<PaymentQrView> {
     }
   }
 
-  // --- Build Method ---
+  // --- Build Method (UI ส่วนเดิม ไม่เปลี่ยนแปลง) ---
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -252,17 +245,16 @@ class _PaymentQrViewState extends State<PaymentQrView> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-
                       TextFormField(
                         controller: _referenceIdController,
-                        decoration: InputDecoration(
-                          labelText: 'ເລກອ້າງອີງ/Transaction ID',
-                          hintText: 'ກອກເລກທີ່ໄດ້ຈາກການໂອນ',
+                        decoration: const InputDecoration(
+                          labelText: 'เลขที่อ้างอิง/Transaction ID',
+                          hintText: 'กรอกเลขที่ได้จากการโอน',
                           border: OutlineInputBorder(),
                         ),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return 'ກະລຸນາກອກເລກອ້າງອີງ';
+                            return 'กรุณากรอกเลขที่อ้างอิง';
                           }
                           return null;
                         },
@@ -270,15 +262,13 @@ class _PaymentQrViewState extends State<PaymentQrView> {
                       const SizedBox(height: 16),
                       TextFormField(
                         controller: _bankBillNumberController,
-                        decoration: InputDecoration(
-                          labelText: 'ເລກບິນທະນາຄານ',
-                          hintText: 'ກອກເລກບິນທະນາຄານ (ຖ້າມີ)',
+                        decoration: const InputDecoration(
+                          labelText: 'เลขบิลธนาคาร',
+                          hintText: 'กรอกเลขบิลธนาคาร (ถ้ามี)',
                           border: OutlineInputBorder(),
                         ),
-
                       ),
                       const SizedBox(height: 32),
-
                       Icon(
                         Icons.qr_code_scanner,
                         size: 100,
@@ -286,13 +276,13 @@ class _PaymentQrViewState extends State<PaymentQrView> {
                       ),
                       const SizedBox(height: 20),
                       const Text(
-                        "ຈຳນວນເງິນທີ່ຕ້ອງຈ່າຍ:",
+                        "จำนวนเงินที่ต้องชำระ:",
                         style: TextStyle(fontSize: 18),
                       ),
                       Padding(
                         padding: const EdgeInsets.all(8.0),
                         child: Text(
-                          '${currencyFormat.format(widget.totalPrice)} ກີບ',
+                          '${currencyFormat.format(widget.totalPrice)} กีบ',
                           style: const TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
@@ -327,7 +317,7 @@ class _PaymentQrViewState extends State<PaymentQrView> {
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
-              child: const Text('ຍົກເລີກ'),
+              child: const Text('ยกเลิก'),
             ),
           ),
           const SizedBox(width: 16),
@@ -351,7 +341,7 @@ class _PaymentQrViewState extends State<PaymentQrView> {
                         strokeWidth: 3,
                       ),
                     )
-                  : const Text('ຢືນຢັນ (QR)'),
+                  : const Text('ยืนยัน (QR)'),
             ),
           ),
         ],

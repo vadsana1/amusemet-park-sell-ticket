@@ -1,0 +1,29 @@
+// Auto-inject namespace for Android plugins that are missing it
+gradle.projectsEvaluated {
+    rootProject.allprojects { project ->
+        afterEvaluate {
+            if (project.hasProperty('android')) {
+                def android = project.android
+                if (android.hasProperty('namespace') && android.namespace == null) {
+                    def nameMap = [
+                        'flutter_pos_printer_platform': 'com.flutter.pos.printer',
+                        'flutter_star_prnt': 'com.flutter.star.prnt',
+                        'network_info_plus': 'com.network.info.plus',
+                        'printing': 'com.printing.lib',
+                        'path_provider_android': 'com.path.provider',
+                        'permission_handler_android': 'com.permission.handler',
+                        'shared_preferences_android': 'com.shared.prefs',
+                        'url_launcher_android': 'com.url.launcher',
+                        'device_info_plus': 'com.device.info.plus',
+                        'package_info_plus': 'com.pkginfo.plus',
+                        'imin_printer': 'com.imin.printer'
+                    ]
+                    if (nameMap.containsKey(project.name)) {
+                        android.namespace = nameMap[project.name]
+                        println("✅ Injected namespace for ${project.name}: ${android.namespace}")
+                    }
+                }
+            }
+        }
+    }
+}

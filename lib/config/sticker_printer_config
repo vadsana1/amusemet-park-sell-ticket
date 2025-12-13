@@ -1,0 +1,96 @@
+// lib/config/sticker_printer_config_page.dart (ตัวอย่าง)
+
+import 'package:flutter/material.dart';
+import '../services/printer_service.dart'; // <<< IMPORT SERVICE
+
+class StickerPrinterConfigPage extends StatelessWidget {
+  const StickerPrinterConfigPage({super.key});
+
+  final PrinterService _printerService = PrinterService();
+
+  // ฟังก์ชันจำลอง Logic การเชื่อมต่อ
+  void handleConnectButton(BuildContext context, dynamic selectedDevice) async {
+    // แสดง Loading หรือ Dialog
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('ກຳລັງເຊື່ອມຕໍ່...')),
+    );
+
+    // เรียก Service ให้ทำการเชื่อมต่อจริง (Service จะอัปเดตสถานะเอง)
+    final success = await _printerService.connectToPrinter(selectedDevice);
+
+    // ซ่อน Loading และแสดงผลลัพธ์
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('✅ ເຊື່ອມຕໍ່ສຳເລັດ!')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('❌ ເຊື່ອມຕໍ່ລົ້ມເຫຼວ.')),
+      );
+      // ถ้าล้มเหลว Service ควรตั้งค่าเป็น false อยู่แล้ว
+    }
+  }
+
+  // ฟังก์ชันตัดการเชื่อมต่อ
+  void handleDisconnectButton(BuildContext context) {
+    // TODO: ใส่ Logic ตัดการเชื่อมต่อจริงที่นี่
+
+    _printerService.setConnectionStatus(false); // อัปเดตสถานะเป็น Disconnected
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('ຕັດການເຊື່ອມຕໍ່ແລ້ວ.')),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('ຕັ້ງຄ່າປຣິນເຕີ TSC')),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // ปุ่มเชื่อมต่อ (สมมติตัวแปรอุปกรณ์)
+            ElevatedButton.icon(
+              icon: const Icon(Icons.bluetooth),
+              label: const Text('ເຊື່ອມຕໍ່ກັບປຣິນເຕີ'),
+              onPressed: () {
+                // สมมติว่านี่คืออุปกรณ์ที่ถูกเลือก
+                handleConnectButton(context, 'Selected_Printer_123');
+              },
+            ),
+            const SizedBox(height: 20),
+
+            // ปุ่มตัดการเชื่อมต่อ
+            ElevatedButton.icon(
+              icon: const Icon(Icons.close),
+              label: const Text('ຕັດການເຊື່ອມຕໍ່'),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              onPressed: () => handleDisconnectButton(context),
+            ),
+
+            const SizedBox(height: 40),
+
+            // ใช้ ValueListenableBuilder เพื่อแสดงสถานะปัจจุบันในหน้านี้ด้วย
+            ValueListenableBuilder<bool>(
+              valueListenable: _printerService.isConnectedNotifier,
+              builder: (context, isConnected, child) {
+                return Text(
+                  isConnected
+                      ? 'ສະຖານະ: ເຊື່ອມຕໍ່ແລ້ວ (ສີຂຽວ)'
+                      : 'ສະຖານະ: ບໍ່ໄດ້ເຊື່ອມຕໍ່ (ສີແດງ)',
+                  style: TextStyle(
+                    color: isConnected ? Colors.green[800] : Colors.red[800],
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                );
+              },
+            )
+          ],
+        ),
+      ),
+    );
+  }
+}
