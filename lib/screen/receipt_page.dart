@@ -273,18 +273,18 @@ class _ReceiptPageState extends State<ReceiptPage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           _buildHeader(response, isFinancialReceipt: true),
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
           _buildInfoRow(
             'ລາຄາທັງໝົດ:',
             '${currencyFormat.format(response.amountDue)} ກີບ',
             isBold: true,
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           _buildInfoRow(
             'ເງິນທີ່ໄດ້ຮັບ:',
             '${currencyFormat.format(response.amountPaid)} ກີບ',
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           _buildInfoRow(
             'ເງິນທອນ:',
             '${currencyFormat.format(response.changeAmount)} ກີບ',
@@ -305,10 +305,10 @@ class _ReceiptPageState extends State<ReceiptPage> {
     String ticketTypeString;
     String countString;
     if (response.adultCount >= 1) {
-      ticketTypeString = 'ຜູ້ໃຫຍ່ (Adult)';
+      ticketTypeString = 'ຜູ້ໃຫຍ່ ';
       countString = '${response.adultCount}';
     } else if (response.childCount >= 1) {
-      ticketTypeString = 'ເດັກນ້ອຍ (Child)';
+      ticketTypeString = 'ເດັກນ້ອຍ';
       countString = '${response.childCount}';
     } else {
       ticketTypeString = 'N/A';

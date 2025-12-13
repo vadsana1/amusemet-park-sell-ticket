@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:typed_data'; // [เพิ่ม] สำหรับจัดการข้อมูลรูปภาพ
+import 'package:flutter/services.dart'; // [เพิ่ม] สำหรับโหลดไฟล์รูป และ MethodChannel
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
@@ -42,6 +44,10 @@ class _PaymentQrViewState extends State<PaymentQrView> {
   // ใช้ API B (Multiple) เป็นหลัก เพื่อรองรับ Nested Visitor และ Array Ticket ID
   final SellDayPassMultipleApi _visitorApiMultiple = SellDayPassMultipleApi();
 
+  // [เพิ่ม] MethodChannel สำหรับจอลูกค้า (Dual Screen)
+  static final platform =
+      const MethodChannel('com.example.amusemet_park_sell_ticket/dual_screen');
+
   bool _isProcessing = false;
   final currencyFormat = NumberFormat("#,##0", "en_US");
 
@@ -54,13 +60,64 @@ class _PaymentQrViewState extends State<PaymentQrView> {
     super.initState();
     _referenceIdController = TextEditingController();
     _bankBillNumberController = TextEditingController();
+
+    // [เพิ่ม] สั่งให้แสดงรูป QR ที่จอหลังทันทีที่เข้าหน้านี้
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _showQrOnCustomerScreen();
+    });
   }
 
   @override
   void dispose() {
     _referenceIdController.dispose();
     _bankBillNumberController.dispose();
+
+    // [เพิ่ม] สั่งเคลียร์จอหลัง (ให้กลับเป็นหน้าว่างหรือ Logo) เมื่อออกจากหน้านี้
+    _resetCustomerScreen();
+
     super.dispose();
+  }
+
+  // --- [เพิ่ม] ฟังก์ชันสำหรับส่งรูปไปจอลูกค้า (Dual Screen) ---
+  // ใช้ MethodChannel เรียก native code สำหรับ Falcon 1
+  Future<void> _showQrOnCustomerScreen() async {
+    try {
+      log("--- 🖼️ กำลังส่งรูป QR ไปที่จอลูกค้า ---");
+
+      // 1. โหลดรูป QR จาก Assets
+      final ByteData data =
+          await rootBundle.load('assets/images/bank_qr_cropped.jpeg');
+      final Uint8List imageBytes = data.buffer.asUint8List();
+
+      // 2. เรียก native method ผ่าน MethodChannel
+      final bool success = await platform.invokeMethod('showImage', {
+        'imageBytes': imageBytes,
+      });
+
+      if (success) {
+        log("✅ QR displayed on customer screen");
+      } else {
+        log("⚠️ Failed to display QR on customer screen");
+      }
+    } catch (e) {
+      log("❌ Error showing QR on customer screen: $e");
+    }
+  }
+
+  // --- [เพิ่ม] ฟังก์ชันเคลียร์จอลูกค้า ---
+  Future<void> _resetCustomerScreen() async {
+    try {
+      // เรียก native method เพื่อล้างจอลูกค้า
+      final bool success = await platform.invokeMethod('clearScreen');
+
+      if (success) {
+        log("✅ Customer screen reset");
+      } else {
+        log("⚠️ Failed to reset customer screen");
+      }
+    } catch (e) {
+      log("❌ Error resetting screen: $e");
+    }
   }
 
   Future<void> _handleConfirmPayment() async {
@@ -91,36 +148,32 @@ class _PaymentQrViewState extends State<PaymentQrView> {
         "visitor_type": widget.visitorType,
       };
 
-      // 2. เตรียม Ticket Payload (ใช้ Logic เดียวกับหน้า Cash)
-      // รวบ ID ทุกใบในตะกร้า เป็น List เดียวกัน [5, 2]
+      // 2. เตรียม Ticket Payload
       final List<int> allTicketIdsInCart =
           widget.cart.map((item) => item.ticket.ticketId).toSet().toList();
 
       List<Map<String, dynamic>> ticketsPayload = [];
-      // สร้างตัวช่วย Mapping เพื่อเช็ค Type ตอน Response กลับมา
       final List<String> expectedTypes = [];
 
-      // วนลูปสร้างตั๋วให้ผู้ใหญ่ทุกคน (ทุกคนได้ Bundle ID เหมือนกัน)
       for (int i = 0; i < widget.globalAdultQty; i++) {
         ticketsPayload.add({
           "visitor_type": "adult",
           "gender": widget.visitorGender,
-          "ticket_id": allTicketIdsInCart, // ส่งเป็น Array [5, 2]
+          "ticket_id": allTicketIdsInCart,
         });
         expectedTypes.add('adult');
       }
 
-      // วนลูปสร้างตั๋วให้เด็กทุกคน
       for (int i = 0; i < widget.globalChildQty; i++) {
         ticketsPayload.add({
           "visitor_type": "child",
           "gender": widget.visitorGender,
-          "ticket_id": allTicketIdsInCart, // ส่งเป็น Array [5, 2]
+          "ticket_id": allTicketIdsInCart,
         });
         expectedTypes.add('child');
       }
 
-      // 3. เตรียม Payment Transactions (ส่วนของ QR)
+      // 3. เตรียม Payment Transactions
       List<Map<String, String>> paymentTransactions = [];
 
       if (_referenceIdController.text.isNotEmpty) {
@@ -156,24 +209,14 @@ class _PaymentQrViewState extends State<PaymentQrView> {
       final List<dynamic> responseList =
           fullResponseMap['purchases'] as List<dynamic>;
 
-      // เช็คว่าจำนวนที่ได้กลับมา ตรงกับที่ส่งไปไหม
-      if (responseList.length != expectedTypes.length) {
-        log(
-          "Warning: Response count (${responseList.length}) != Request count (${expectedTypes.length})",
-        );
-      }
-
       List<ApiTicketResponse> apiResponses = [];
       for (int i = 0; i < responseList.length; i++) {
         final responseData = responseList[i] as Map<String, dynamic>;
 
-        // ใช้ Type จากที่เรา Loop ไว้ หรือถ้า API แม่นยำใช้จาก API ก็ได้
-        // ในที่นี้ใช้ logic เดียวกับ Cash คือ map กลับมาตาม index
         String type = (i < expectedTypes.length)
             ? expectedTypes[i]
             : responseData['ticket_type'] ?? 'adult';
 
-        // Double Check จาก API Response
         if (responseData.containsKey('ticket_type')) {
           type = responseData['ticket_type'];
         }
@@ -230,7 +273,6 @@ class _PaymentQrViewState extends State<PaymentQrView> {
     }
   }
 
-  // --- Build Method (UI ส่วนเดิม ไม่เปลี่ยนแปลง) ---
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -269,11 +311,15 @@ class _PaymentQrViewState extends State<PaymentQrView> {
                         ),
                       ),
                       const SizedBox(height: 32),
+
+                      // ส่วนแสดง QR บนจอพนักงาน (หน้าจอนี้)
+                      // ถ้าอยากแสดงรูปบัญชีตรงนี้ด้วย ให้เปลี่ยน Icon เป็น Image.asset('assets/images/bank_qr_cropped.jpg')
                       Icon(
                         Icons.qr_code_scanner,
                         size: 100,
                         color: Colors.grey[700],
                       ),
+
                       const SizedBox(height: 20),
                       const Text(
                         "จำนวนเงินที่ต้องชำระ:",

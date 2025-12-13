@@ -77,6 +77,36 @@ class StickerPrinterService {
         'SERVICE STATUS UPDATED: ${isConnected ? "CONNECTED" : "DISCONNECTED"}');
   }
 
+  // ตรวจสอบสถานะการเชื่อมต่อจริงโดย scan หาอุปกรณ์
+  Future<bool> checkConnection() async {
+    try {
+      if (_connectedDevice == null) {
+        setConnectionStatus(false);
+        return false;
+      }
+
+      // ลอง scan หาอุปกรณ์ที่เชื่อมต่อไว้ยังอยู่หรือไม่
+      final devices = await scanDevices();
+      final isStillConnected = devices.any((d) =>
+          d['vendorId'].toString() ==
+              _connectedDevice!['vendorId'].toString() &&
+          d['productId'].toString() ==
+              _connectedDevice!['productId'].toString());
+
+      if (!isStillConnected) {
+        debugPrint('⚠️ Device disconnected - updating status');
+        setConnectionStatus(false);
+        return false;
+      }
+
+      return true;
+    } catch (e) {
+      debugPrint('checkConnection error: $e');
+      setConnectionStatus(false);
+      return false;
+    }
+  }
+
   Future<List<Map<String, dynamic>>> scanDevices() async {
     try {
       return await FlutterUsbPrinter.getUSBDeviceList();
@@ -256,8 +286,8 @@ class StickerPrinterService {
   // 💡 ฟังก์ชันใหม่สำหรับพิมพ์รูปภาพทั้งใบ (Print Image File)
   Future<void> printImageFile(
     Uint8List imageBytes, {
-    int x = 0,
-    int y = 12, // add small top margin
+    int x = 0, // ตำแหน่งเริ่มต้น (ซ้าย)
+    int y = 0, // ตำแหน่งเริ่มต้น (บน)
     int maxWidthDots = 480, // ~60mm at 203dpi
     bool invertColors =
         true, // TSC BITMAP tends to invert; default to invert to keep white bg

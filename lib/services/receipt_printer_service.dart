@@ -50,7 +50,7 @@ class ReceiptPrinterService {
       await iminPrinter.printText(
         'ລາຍງານສະຫຼຸບຮອບ',
         style: IminTextStyle(
-          fontSize: 35,
+          fontSize: 28,
           align: IminPrintAlign.center,
           fontStyle: IminFontStyle.bold,
         ),
@@ -60,26 +60,26 @@ class ReceiptPrinterService {
       // 2. ข้อมูลผู้ขายและกะ (จัดชิดซ้าย)
       await iminPrinter.printText(
         'ຜູ້ຂາຍ: $cashierName',
-        style: IminTextStyle(fontSize: 26, align: IminPrintAlign.left),
+        style: IminTextStyle(fontSize: 12, align: IminPrintAlign.left),
       );
       await iminPrinter.printText(
         'ເລກທີຮອບ: $shiftId',
-        style: IminTextStyle(fontSize: 26, align: IminPrintAlign.left),
+        style: IminTextStyle(fontSize: 12, align: IminPrintAlign.left),
       );
       await iminPrinter.printText('--------------------------------');
 
       // 3. ข้อมูลช่วงเวลา
       await iminPrinter.printText(
         '--- ໄລຍະເວລາ ---',
-        style: IminTextStyle(fontSize: 28, align: IminPrintAlign.center),
+        style: IminTextStyle(fontSize: 14, align: IminPrintAlign.center),
       );
       await iminPrinter.printText(
         'ເລີ່ມ: $startDate',
-        style: IminTextStyle(fontSize: 26, align: IminPrintAlign.left),
+        style: IminTextStyle(fontSize: 14, align: IminPrintAlign.left),
       );
       await iminPrinter.printText(
         'ສິ້ນສຸດ: $endDate',
-        style: IminTextStyle(fontSize: 26, align: IminPrintAlign.left),
+        style: IminTextStyle(fontSize: 14, align: IminPrintAlign.left),
       );
       await iminPrinter.printText('--------------------------------');
 
@@ -87,7 +87,7 @@ class ReceiptPrinterService {
 
       await iminPrinter.printText(
         '--- ຍອດຂາຍ (Sales) ---',
-        style: IminTextStyle(fontSize: 28, align: IminPrintAlign.center),
+        style: IminTextStyle(fontSize: 14, align: IminPrintAlign.center),
       );
       // ยอดขายรวม
       await _printRow('ຍອດຂາຍທັງໝົດ:', '$totalRevenue ກີບ', isBold: true);
@@ -100,7 +100,7 @@ class ReceiptPrinterService {
       // 5. สรุปจำนวนผู้เข้าชม
       await iminPrinter.printText(
         '--- ຈຳນວນປີ້ (Tickets) ---',
-        style: IminTextStyle(fontSize: 28, align: IminPrintAlign.center),
+        style: IminTextStyle(fontSize: 14, align: IminPrintAlign.center),
       );
       await _printRow('ລວມຈໍານວນປີ້ຂາຍ:', '$totalTickets ໃບ', isBold: true);
       await _printRow(' - ຜູ້ໃຫຍ່:', '$adultVisitors ຄົນ');
@@ -113,7 +113,7 @@ class ReceiptPrinterService {
       // 6. ช่องทางการชำระเงิน
       await iminPrinter.printText(
         '--- ການຊໍາລະ ---',
-        style: IminTextStyle(fontSize: 28, align: IminPrintAlign.center),
+        style: IminTextStyle(fontSize: 12, align: IminPrintAlign.center),
       );
       for (var p in payments) {
         // p['method'] คือชื่อเต็ม, p['total'] คือยอด
@@ -125,7 +125,7 @@ class ReceiptPrinterService {
       // 7. สรุปเครื่องเล่น
       await iminPrinter.printText(
         '--- ການຫຼິ້ນ (Rides) ---',
-        style: IminTextStyle(fontSize: 28, align: IminPrintAlign.center),
+        style: IminTextStyle(fontSize: 12, align: IminPrintAlign.center),
       );
       await _printRow('ລວມການຫຼິ້ນ:', '$totalPlays ຄັ້ງ');
       await _printRow(' - ຜູ້ໃຫຍ່:', '$adultsPlayed ຄັ້ງ');
@@ -307,10 +307,10 @@ class ReceiptPrinterService {
   }) async {
     // -------------------------------------------------------------------
     // [แก้ไขจุดสำคัญ] สูตรคำนวณพื้นที่
-    // - ถ้าตัวหนา (Size 30) ตัวหนังสือจะอ้วน กินที่เยอะ -> ให้ใช้แค่ 36 ช่อง
-    // - ถ้าตัวปกติ (Size 26) ตัวหนังสือจะผอมกว่า -> ให้ใช้ 46 ช่อง
+    // - ถ้าตัวหนา (Size 24) ตัวหนังสือจะอ้วน กินที่เยอะ -> ให้ใช้แค่ 42 ช่อง
+    // - ถ้าตัวปกติ (Size 22) ตัวหนังสือจะผอมกว่า -> ให้ใช้ 52 ช่อง
     // -------------------------------------------------------------------
-    int maxLineChars = isBold ? 36 : 46;
+    int maxLineChars = isBold ? 42 : 52;
 
     int labelWidth = _getVisibleLength(label);
     int valueWidth = _getVisibleLength(value);
@@ -325,7 +325,7 @@ class ReceiptPrinterService {
     await iminPrinter.printText(
       finalLine,
       style: IminTextStyle(
-        fontSize: isBold ? 30 : 26,
+        fontSize: isBold ? 24 : 22,
         align: IminPrintAlign.left,
         fontStyle: isBold ? IminFontStyle.bold : IminFontStyle.normal,
       ),

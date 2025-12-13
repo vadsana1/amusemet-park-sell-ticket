@@ -43,12 +43,9 @@ class _StickerPrinterConfigPageState extends State<StickerPrinterConfigPage> {
   // Settings
   double _darknessLevel = 8.0;
 
-  // รายการขนาดกระดาษ
+  // รายการขนาดกระดาษ (เหลือแค่ 6x4cm)
   final List<LabelSize> _paperSizes = [
-    const LabelSize('60x40', '60 x 40 mm (Default)', 60, 40),
-    const LabelSize('100x60', '100 x 60 mm (Large)', 100, 60),
-    const LabelSize('80x50', '80 x 50 mm (Medium)', 80, 50),
-    const LabelSize('50x30', '50 x 30 mm (Small)', 50, 30),
+    const LabelSize('60x40', '60 x 40 mm (6 x 4 cm)', 60, 40),
   ];
   late LabelSize _selectedSize;
 
@@ -58,6 +55,16 @@ class _StickerPrinterConfigPageState extends State<StickerPrinterConfigPage> {
     _selectedSize = _paperSizes[0];
     _loadSettings();
     // Auto-connect already happens in HomePage, no need to call again here
+    // แต่ตรวจสอบสถานะปัจจุบันว่ายังเชื่อมต่ออยู่หรือไม่
+    _checkCurrentConnection();
+  }
+
+  // ตรวจสอบสถานะการเชื่อมต่อเมื่อเข้าหน้า Config
+  Future<void> _checkCurrentConnection() async {
+    await Future.delayed(const Duration(milliseconds: 500));
+    if (mounted) {
+      await _printerService.checkConnection();
+    }
   }
 
   Future<void> _loadSettings() async {
@@ -87,10 +94,10 @@ class _StickerPrinterConfigPageState extends State<StickerPrinterConfigPage> {
     await prefs.setDouble('printer_width', _selectedSize.widthMm);
     await prefs.setDouble('printer_height', _selectedSize.heightMm);
 
-    print(
-        '✅ Saved: Darkness=$_darknessLevel, Size=${_selectedSize.widthMm}x${_selectedSize.heightMm}');
-    _showSnack("ບັນທຶກສຳເລັດ: ຄວາມເຂັ້ມ ${_darknessLevel.toInt()}",
-        AppTheme.successGreen);
+    // print(
+    //     '✅ Saved: Darkness=$_darknessLevel, Size=${_selectedSize.widthMm}x${_selectedSize.heightMm}');
+    // _showSnack("ບັນທຶກສຳເລັດ: ຄວາມເຂັ້ມ ${_darknessLevel.toInt()}",
+    // AppTheme.successGreen);
   }
 
   // --- Actions ---
@@ -227,7 +234,7 @@ class _StickerPrinterConfigPageState extends State<StickerPrinterConfigPage> {
     } catch (e) {
       // ✅ [สำคัญ] อัปเดตสถานะใน Service เมื่อมี Exception
       _printerService.setConnectionStatus(false);
-      _showSnack("❌ ເຊື່ອມຈໍ່ບໍ່ໄດ້: $e", AppTheme.errorRed);
+      _showSnack("❌ ເຊື່ອມຕໍ່ບໍ່ໄດ້: $e", AppTheme.errorRed);
     }
   }
 
@@ -329,11 +336,110 @@ class _StickerPrinterConfigPageState extends State<StickerPrinterConfigPage> {
               ),
             ),
 
+            const SizedBox(height: 15),
+
+            // 2.5 Reconnect Button (สำหรับหลังเปลี่ยนกระดาษ)
+            ValueListenableBuilder<bool>(
+              valueListenable: _printerService.isConnectedNotifier,
+              builder: (context, isConnected, child) {
+                // แสดงปุ่มเฉพาะเมื่อเชื่อมต่ออยู่
+                if (!isConnected) return const SizedBox.shrink();
+
+                return Column(
+                  children: [
+                    // ปุ่ม Check Status
+                    SizedBox(
+                      width: double.infinity,
+                      height: 45,
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          final stillConnected =
+                              await _printerService.checkConnection();
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(stillConnected
+                                    ? 'ເຊື່ອມຕໍ່ປົກກະຕິ (Still Connected)'
+                                    : 'ຕັດການເຊື່ອມຕໍ່ແລ້ວ (Disconnected)'),
+                                backgroundColor:
+                                    stillConnected ? Colors.green : Colors.red,
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                          }
+                        },
+                        icon: const Icon(Icons.wifi_find),
+                        label: const Text("Check Status"),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.blueGrey,
+                          side: const BorderSide(
+                              color: Colors.blueGrey, width: 2),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    // ปุ่ม Reconnect
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          // เชื่อมต่อใหม่กับเครื่องพิมพ์ที่บันทึกไว้
+                          await _printerService.autoConnectOnStartup();
+
+                          if (!mounted) return;
+
+                          // เช็คสถานะการเชื่อมต่อหลังจากพยายาม reconnect
+                          final bool isConnected =
+                              _printerService.isConnectedNotifier.value;
+
+                          if (!mounted) return;
+
+                          if (isConnected) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                    'ເຊື່ອມຕໍ່ໃໝ່ສຳເລັດ (Reconnected successfully)'),
+                                backgroundColor: Colors.green,
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content:
+                                    Text('ເຊື່ອມຕໍ່ໃໝ່ບໍ່ສຳເລັດ ກະລຸນາລອງໃໝ່'),
+                                backgroundColor: Colors.orange,
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                          }
+                        },
+                        icon: const Icon(Icons.refresh),
+                        label: const Text("Reconnect (ຫຼັງປ່ຽນກະເຈ້ຍ)"),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppTheme.primaryTeal,
+                          side:
+                              BorderSide(color: AppTheme.primaryTeal, width: 2),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+
             const SizedBox(height: 30),
             const Divider(),
             const SizedBox(height: 20),
 
-            // 3. Configuration Form (โค้ดเดิม)
+            // 3. Configuration Form
             const Align(
               alignment: Alignment.centerLeft,
               child: Text("Configuration",
@@ -341,26 +447,28 @@ class _StickerPrinterConfigPageState extends State<StickerPrinterConfigPage> {
             ),
             const SizedBox(height: 15),
 
-            // Paper Size Dropdown
+            // Paper Size Display (แสดงเฉพาะ 6x4cm)
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
               decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: Colors.grey.shade300)),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<LabelSize>(
-                  isExpanded: true,
-                  value: _selectedSize,
-                  items: _paperSizes.map((s) {
-                    return DropdownMenuItem(value: s, child: Text(s.name));
-                  }).toList(),
-                  onChanged: (val) {
-                    if (val != null) {
-                      setState(() => _selectedSize = val);
-                    }
-                  },
-                ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Paper Size:',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                  ),
+                  Text(
+                    _selectedSize.name,
+                    style: const TextStyle(
+                        fontSize: 16,
+                        color: AppTheme.primaryTeal,
+                        fontWeight: FontWeight.bold),
+                  ),
+                ],
               ),
             ),
 

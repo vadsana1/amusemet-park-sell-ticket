@@ -11,7 +11,7 @@ import '../models/api_ticket_response.dart';
 import './receipt_page.dart';
 import '../services/newticket_api.dart';
 import '../services/newticket_multiple_api.dart';
-import '../utils/thousands_formatter.dart'; 
+import '../utils/thousands_formatter.dart';
 
 class PaymentCashView extends StatefulWidget {
   final double totalPrice;
@@ -155,9 +155,8 @@ class _PaymentCashViewState extends State<PaymentCashView> {
         "visitor_type": widget.visitorType,
       };
 
-      final List<Map<String, dynamic>> cashPayload = cashDetailsList
-          .map((cash) => cash.toMap())
-          .toList();
+      final List<Map<String, dynamic>> cashPayload =
+          cashDetailsList.map((cash) => cash.toMap()).toList();
 
       List<Map<String, dynamic>> ticketsPayload;
       final List<TicketDetail> ticketDetailsForResponseMapping = [];
@@ -168,26 +167,23 @@ class _PaymentCashViewState extends State<PaymentCashView> {
 
         String visitorType = (widget.globalAdultQty == 1) ? 'adult' : 'child';
 
-        ticketsPayload = []; 
-        for (var item in widget.cart) { 
+        ticketsPayload = [];
+        for (var item in widget.cart) {
           var detail = TicketDetail(
             ticketId: item.ticket.ticketId,
             visitorType: visitorType,
             gender: widget.visitorGender,
           );
-          ticketsPayload.add(detail.toMap()); 
+          ticketsPayload.add(detail.toMap());
           ticketDetailsForResponseMapping.add(detail);
         }
-
       } else {
         log('--- ℹ️ Building Payload (API B - 1 object per Person) ---');
 
-        final List<int> allTicketIdsInCart = widget.cart
-            .map((item) => item.ticket.ticketId)
-            .toSet()
-            .toList();
-        
-        ticketsPayload = []; 
+        final List<int> allTicketIdsInCart =
+            widget.cart.map((item) => item.ticket.ticketId).toSet().toList();
+
+        ticketsPayload = [];
 
         for (int i = 0; i < widget.globalAdultQty; i++) {
           ticketsPayload.add({
@@ -195,18 +191,19 @@ class _PaymentCashViewState extends State<PaymentCashView> {
             "gender": widget.visitorGender,
             "ticket_id": allTicketIdsInCart, // 👈 ticket_id ເປັນ Array
           });
-          ticketDetailsForResponseMapping.add(TicketDetail(ticketId: 0, visitorType: 'adult', gender: ''));
+          ticketDetailsForResponseMapping
+              .add(TicketDetail(ticketId: 0, visitorType: 'adult', gender: ''));
         }
         for (int i = 0; i < widget.globalChildQty; i++) {
           ticketsPayload.add({
             "visitor_type": "child",
             "gender": widget.visitorGender,
-            "ticket_id": allTicketIdsInCart, 
+            "ticket_id": allTicketIdsInCart,
           });
-          ticketDetailsForResponseMapping.add(TicketDetail(ticketId: 0, visitorType: 'child', gender: ''));
+          ticketDetailsForResponseMapping
+              .add(TicketDetail(ticketId: 0, visitorType: 'child', gender: ''));
         }
       }
-
 
       final Map<String, dynamic> basePayload = {
         "tickets": ticketsPayload,
@@ -235,7 +232,7 @@ class _PaymentCashViewState extends State<PaymentCashView> {
         if (purchasesList == null || purchasesList.isEmpty) {
           throw Exception('API (A) did not return "purchases" list.');
         }
-        
+
         final Map<String, dynamic> purchaseMap = purchasesList.first;
 
         apiResponses.add(
@@ -251,35 +248,33 @@ class _PaymentCashViewState extends State<PaymentCashView> {
           ...basePayload,
           "visitor": visitorDetails,
         };
-        
+
         log('Payload Multiple (Nested) Sent: ${json.encode(nestedPayload)}');
         log('Calling API (B): sellDayPassMultiple (ຕົວໃໝ່)');
 
-        final Map<String, dynamic> fullResponseMap = await _visitorApiB
-            .sellDayPassMultiple(nestedPayload);
-        
+        final Map<String, dynamic> fullResponseMap =
+            await _visitorApiB.sellDayPassMultiple(nestedPayload);
+
         log('--- ✅ Full API (B) Response ---: ${json.encode(fullResponseMap)}');
 
         final List<dynamic> responseList =
             fullResponseMap['purchases'] as List<dynamic>;
 
         if (responseList.length != ticketDetailsForResponseMapping.length) {
-           throw Exception(
-            "API response count (${responseList.length}) does not match sent payload count (${ticketDetailsForResponseMapping.length})."
-          );
+          throw Exception(
+              "API response count (${responseList.length}) does not match sent payload count (${ticketDetailsForResponseMapping.length}).");
         }
 
         apiResponses = [];
         for (int i = 0; i < responseList.length; i++) {
-          
-          final responseData = responseList[i] as Map<String, dynamic>; 
+          final responseData = responseList[i] as Map<String, dynamic>;
           final sentData = ticketDetailsForResponseMapping[i];
-          final String visitorType = sentData.visitorType; 
+          final String visitorType = sentData.visitorType;
 
           apiResponses.add(
             ApiTicketResponse.fromMap(
-              purchaseMap: responseData, 
-              rootMap: fullResponseMap, 
+              purchaseMap: responseData,
+              rootMap: fullResponseMap,
               globalAdultQty: visitorType == 'adult' ? 1 : 0,
               globalChildQty: visitorType == 'child' ? 1 : 0,
             ),
@@ -335,19 +330,23 @@ class _PaymentCashViewState extends State<PaymentCashView> {
     bool canConfirm = _amountReceived >= widget.totalPrice && !_isProcessing;
     return Column(
       children: [
+        const SizedBox(height: 12), // เพิ่ม margin ด้านบน
         Padding(
-          padding: const EdgeInsets.only(top: 8.0),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text(
             'ມູນຄ່າສິນຄ້າ: ${currencyFormat.format(widget.totalPrice)} ກີບ',
             style: TextStyle(fontSize: 18, color: Colors.grey[700]),
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 16),
         Expanded(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Column(
-              children: [_buildDenominationButtons(), _buildSummaryInfo()],
+              children: [
+                _buildDenominationButtons(),
+                _buildSummaryInfo(),
+              ],
             ),
           ),
         ),
@@ -361,74 +360,104 @@ class _PaymentCashViewState extends State<PaymentCashView> {
       spacing: 12,
       runSpacing: 12,
       alignment: WrapAlignment.center,
-      children: _denominations.map((denomination) {
-        final count = _cashCounts[denomination] ?? 0;
-        return GestureDetector(
-          onTap: _isProcessing
-              ? null
-              : () => _updateFromButtons(denomination, 1),
-          onLongPress: _isProcessing
-              ? null
-              : () => _updateFromButtons(denomination, -1),
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Container(
-                width: 100,
-                height: 70,
-                decoration: BoxDecoration(
-                  color: Colors.amber[100],
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.amber[300]!, width: 1.5),
-                ),
-                child: Center(
-                  child: Text(
-                    currencyFormat.format(denomination),
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.brown[800],
-                    ),
+      children: [
+        ..._denominations.map((denomination) {
+          final count = _cashCounts[denomination] ?? 0;
+          return GestureDetector(
+            onTap: _isProcessing
+                ? null
+                : () => _updateFromButtons(denomination, 1),
+            onLongPress: _isProcessing
+                ? null
+                : () => _updateFromButtons(denomination, -1),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  width: 100,
+                  height: 70,
+                  decoration: BoxDecoration(
+                    color: Colors.amber[100],
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.amber[300]!, width: 1.5),
                   ),
-                ),
-              ),
-              if (count > 0)
-                Positioned(
-                  top: -8,
-                  right: -8,
-                  child: Container(
-                    padding: const EdgeInsets.all(2),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1A9A8B),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
-                    ),
-                    constraints: const BoxConstraints(
-                      minWidth: 24,
-                      minHeight: 24,
-                    ),
-                    child: Center(
-                      child: Text(
-                        count.toString(),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
+                  child: Center(
+                    child: Text(
+                      currencyFormat.format(denomination),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.brown[800],
                       ),
                     ),
                   ),
                 ),
-            ],
+                if (count > 0)
+                  Positioned(
+                    top: -8,
+                    right: -8,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1A9A8B),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 24,
+                        minHeight: 24,
+                      ),
+                      child: Center(
+                        child: Text(
+                          count.toString(),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          );
+        }),
+        // ปุ่มล้าง
+        GestureDetector(
+          onTap: _isProcessing ? null : _clearAll,
+          child: Container(
+            width: 100,
+            height: 70,
+            decoration: BoxDecoration(
+              color: Colors.red[50],
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.red, width: 2),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.clear_all, color: Colors.red, size: 24),
+                const SizedBox(height: 4),
+                Text(
+                  'ລ້າງ',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.red[700],
+                  ),
+                ),
+              ],
+            ),
           ),
-        );
-      }).toList(),
+        ),
+      ],
     );
   }
 
   Widget _buildSummaryInfo() {
     return Padding(
-      padding: const EdgeInsets.only(top: 24, left: 16, right: 16),
+      padding: const EdgeInsets.only(top: 16, left: 16, right: 16, bottom: 16),
       child: Column(
         children: [
           Row(
@@ -481,14 +510,6 @@ class _PaymentCashViewState extends State<PaymentCashView> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          TextButton(
-            onPressed: _isProcessing ? null : _clearAll,
-            child: const Text(
-              'ລ້າງ',
-              style: TextStyle(color: Colors.red, fontSize: 16),
-            ),
-          ),
         ],
       ),
     );
@@ -496,7 +517,7 @@ class _PaymentCashViewState extends State<PaymentCashView> {
 
   Widget _buildActionButtons(BuildContext context, bool canConfirm) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       child: Row(
         children: [
           Expanded(
