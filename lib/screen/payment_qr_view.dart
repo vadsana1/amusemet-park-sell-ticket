@@ -231,7 +231,7 @@ class _PaymentQrViewState extends State<PaymentQrView> {
         );
       }
 
-      log('--- ✅ สำเร็จ (QR) ได้ตั๋ว: ${apiResponses.length} ใบ ---');
+     
 
       if (!mounted) return;
 
@@ -256,11 +256,11 @@ class _PaymentQrViewState extends State<PaymentQrView> {
         builder: (ctx) => AlertDialog(
           title: const Text('Error'),
           content: Text(
-            'เกิดข้อผิดพลาด: ${e.toString().split("Exception: ").last}',
+            'ເກີດຂໍ້ຜິດພາດ: ${e.toString().split("Exception: ").last}',
           ),
           actions: [
             TextButton(
-              child: const Text('ตกลง'),
+              child: const Text('ຕົກລົງ'),
               onPressed: () => Navigator.of(ctx).pop(),
             ),
           ],
@@ -290,13 +290,13 @@ class _PaymentQrViewState extends State<PaymentQrView> {
                       TextFormField(
                         controller: _referenceIdController,
                         decoration: const InputDecoration(
-                          labelText: 'เลขที่อ้างอิง/Transaction ID',
-                          hintText: 'กรอกเลขที่ได้จากการโอน',
+                          labelText: 'ປ້ອນເລກທີອ້າງ/reference ID',
+                          hintText: 'ປ້ອນເລກທີອ້າງ',
                           border: OutlineInputBorder(),
                         ),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return 'กรุณากรอกเลขที่อ้างอิง';
+                            return 'ກະລຸນາປ້ອນເລກທີອ້າງ';
                           }
                           return null;
                         },
@@ -305,8 +305,8 @@ class _PaymentQrViewState extends State<PaymentQrView> {
                       TextFormField(
                         controller: _bankBillNumberController,
                         decoration: const InputDecoration(
-                          labelText: 'เลขบิลธนาคาร',
-                          hintText: 'กรอกเลขบิลธนาคาร (ถ้ามี)',
+                          labelText: 'ເລກທີອ້າງອີງ2',
+                          hintText: 'ປ້ອນເລກທ້າຍ 5 ຕົວ',
                           border: OutlineInputBorder(),
                         ),
                       ),
@@ -322,7 +322,7 @@ class _PaymentQrViewState extends State<PaymentQrView> {
 
                       const SizedBox(height: 20),
                       const Text(
-                        "จำนวนเงินที่ต้องชำระ:",
+                        "ຈຳນວນເງິນທີ່ຕ້ອງຊຳລະ:",
                         style: TextStyle(fontSize: 18),
                       ),
                       Padding(
@@ -363,7 +363,7 @@ class _PaymentQrViewState extends State<PaymentQrView> {
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
-              child: const Text('ยกเลิก'),
+              child: const Text('ຍົກເລີກ'),
             ),
           ),
           const SizedBox(width: 16),
@@ -387,7 +387,7 @@ class _PaymentQrViewState extends State<PaymentQrView> {
                         strokeWidth: 3,
                       ),
                     )
-                  : const Text('ยืนยัน (QR)'),
+                  : const Text('ຢືນຢັນ'),
             ),
           ),
         ],
