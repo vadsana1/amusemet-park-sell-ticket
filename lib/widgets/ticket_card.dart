@@ -15,17 +15,14 @@ class TicketCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // กำหนดสีพื้นหลังและสี Text ตามเงื่อนไข isSelected
-    final Color cardColor = isSelected
-        ? Colors.transparent
-        : const Color(0xFF1A9A8B);
-    final Color borderColor = isSelected
-        ? const Color(0xFF1A9A8B)
-        : Colors.transparent;
+    // Set background color and text color based on isSelected condition
+    final Color cardColor =
+        isSelected ? Colors.transparent : const Color(0xFF1A9A8B);
+    final Color borderColor =
+        isSelected ? const Color(0xFF1A9A8B) : Colors.transparent;
     final double borderWidth = isSelected ? 3.0 : 0.0;
-    final Color contentColor = isSelected
-        ? const Color(0xFF1A9A8B)
-        : Colors.white;
+    final Color contentColor =
+        isSelected ? const Color(0xFF1A9A8B) : Colors.white;
 
     return InkWell(
       onTap: isSelected ? null : onTap,
@@ -40,7 +37,7 @@ class TicketCard extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // --- ส่วนแสดงรูปภาพ (แก้ไขใหม่) ---
+            // --- Image display section (modified) ---
             Container(
               width: 60,
               height: 60,
@@ -49,18 +46,18 @@ class TicketCard extends StatelessWidget {
                     ? Colors.grey.withAlpha(25)
                     : Colors.white.withAlpha(
                         50,
-                      ), // ปรับให้จางลงหน่อยเพื่อให้เห็นรูปชัดขึ้นถ้ารูปเป็น PNG ใส
+                      ), // Adjust to make more transparent so PNG images show clearer
                 borderRadius: BorderRadius.circular(8.0),
               ),
               child: ClipRRect(
-                // ใช้ ClipRRect เพื่อให้รูปภาพโค้งตามขอบ Container
+                // Use ClipRRect to round image corners matching Container
                 borderRadius: BorderRadius.circular(8.0),
                 child: (ticket.imageUrl != null && ticket.imageUrl!.isNotEmpty)
                     ? Image.network(
                         ticket.imageUrl!,
-                        fit: BoxFit.cover, // ให้รูปขยายเต็มพื้นที่
+                        fit: BoxFit.cover, // Expand image to fill area
                         errorBuilder: (context, error, stackTrace) {
-                          // กรณีโหลดรูปไม่ได้ ให้แสดง Icon เดิมแทน
+                       
                           return Center(
                             child: Icon(
                               Icons.local_activity,
@@ -71,7 +68,7 @@ class TicketCard extends StatelessWidget {
                         },
                       )
                     : Center(
-                        // กรณีไม่มี URL ให้แสดง Icon เดิม
+                        // If no URL, show original icon
                         child: Icon(
                           Icons.local_activity,
                           color: contentColor,
@@ -96,7 +93,7 @@ class TicketCard extends StatelessWidget {
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
-                    maxLines: 1, // เพิ่ม maxLines เพื่อความสวยงาม
+                    maxLines: 1, // Add maxLines for visual appeal
                     overflow: TextOverflow.ellipsis,
                   ),
                   Text(

@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-// --- 1. Model CashDetail (ຄືເກົ່າ) ---
+// --- 1. Model CashDetail (same as before) ---
 class CashDetail {
   final int denomination;
   final int quantity;
@@ -12,28 +12,28 @@ class CashDetail {
   }
 }
 
-// --- 2. Model TicketDetail (ແກ້ໄຂ: ເພີ່ມ gender) ---
+// --- 2. Model TicketDetail (Modified: Added gender) ---
 class TicketDetail {
   final int ticketId;
   final String visitorType;
-  final String gender; // <-- ✅ ເພີ່ມ gender ເຂົ້າມາ
+  final String gender; // <-- ✅ Added gender field
 
   TicketDetail({
     required this.ticketId,
     required this.visitorType,
-    required this.gender, // <-- ✅ ເພີ່ມໃນ constructor
+    required this.gender, // <-- ✅ Added to constructor
   });
 
   Map<String, dynamic> toMap() {
     return {
       'ticket_id': ticketId,
       'visitor_type': visitorType,
-      'gender': gender, // <-- ✅ ເພີ່ມໃນ toMap
+      'gender': gender, // <-- ✅ Added to toMap
     };
   }
 }
 
-// --- 3. Model ຫຼັກ NewVisitorTicket (ປັບປຸງຕາມ Payload ຂອງ API) ---
+// --- 3. Main Model NewVisitorTicket (Updated to match API Payload) ---
 class NewVisitorTicket {
   final String visitorUid;
   final String fullName;
@@ -45,7 +45,7 @@ class NewVisitorTicket {
   final int amountDue;
   final int amountPaid;
   final int changeAmount;
-  final List<CashDetail>? paymentTransactions; // ປ່ຽນຊື່ຕາມ API
+  final List<CashDetail>? paymentTransactions; // Renamed to match API
 
   NewVisitorTicket({
     required this.visitorUid,
@@ -60,8 +60,8 @@ class NewVisitorTicket {
     this.paymentTransactions,
   });
 
-  // (ສຳຄັນທີ່ສຸດ) toMap() ນີ້ໃຊ້ໄດ້ກັບ API ເສັ້ນດຽວ (sellDayPass)
-  // ແຕ່ສຳລັບເສັ້ນ Multiple (sellDayPassMultiple) ທ່ານໄດ້ແກ້ໄຂແລ້ວໃນ PaymentCashView.dart
+  // (Most Important) This toMap() works with single API endpoint (sellDayPass)
+  // But for Multiple endpoint (sellDayPassMultiple) you already fixed it in PaymentCashView.dart
   Map<String, dynamic> toMap() {
     final map = {
       'visitor_uid': visitorUid,
@@ -75,11 +75,10 @@ class NewVisitorTicket {
       'change_amount': changeAmount,
     };
 
-    // ປ່ຽນ 'cash_details' ເປັນ 'payment_transactions'
+    // Changed 'cash_details' to 'payment_transactions'
     if (paymentTransactions != null && paymentTransactions!.isNotEmpty) {
-      map['payment_transactions'] = paymentTransactions!
-          .map((c) => c.toMap())
-          .toList();
+      map['payment_transactions'] =
+          paymentTransactions!.map((c) => c.toMap()).toList();
     }
 
     return map;

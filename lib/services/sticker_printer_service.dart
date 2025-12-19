@@ -9,11 +9,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-// --- Imports สำหรับ Bitmap Printing ---
 import 'dart:ui' as ui;
 import 'package:image/image.dart' as img;
 
-// 💡 TOP-LEVEL FUNCTION สำหรับ compute (รันบน Isolate แยก)
 Uint8List _convertToTsplMonochrome(Map<String, dynamic> data) {
   final img.Image monoImage = data['image'];
   final int widthBytes = data['widthBytes'];
@@ -54,7 +52,7 @@ Uint8List _convertToTsplMonochrome(Map<String, dynamic> data) {
 }
 
 // ------------------------------------------------------------------
-// 🚀 CLASS DEFINITION
+//  CLASS DEFINITION
 // ------------------------------------------------------------------
 class StickerPrinterService {
   // --- Singleton Pattern ---
@@ -77,7 +75,6 @@ class StickerPrinterService {
         'SERVICE STATUS UPDATED: ${isConnected ? "CONNECTED" : "DISCONNECTED"}');
   }
 
-  // ตรวจสอบสถานะการเชื่อมต่อจริงโดย scan หาอุปกรณ์
   Future<bool> checkConnection() async {
     try {
       if (_connectedDevice == null) {
@@ -85,7 +82,6 @@ class StickerPrinterService {
         return false;
       }
 
-      // ลอง scan หาอุปกรณ์ที่เชื่อมต่อไว้ยังอยู่หรือไม่
       final devices = await scanDevices();
       final isStillConnected = devices.any((d) =>
           d['vendorId'].toString() ==
@@ -172,8 +168,6 @@ class StickerPrinterService {
   }
 
   // -------------------------------------------------------------------
-  // 💡 [เมธอดที่ถูกกู้คืน] printTicket - ใช้สำหรับ Test Print ใน Config Page
-  // -------------------------------------------------------------------
   Future<void> printTicket({
     required String ticketId,
     required String shopName,
@@ -199,46 +193,38 @@ class StickerPrinterService {
 
       int currentY = 10;
 
-      // A. ชื่อร้าน (Laodoove) - ใช้ TEXT
       printData.add(Uint8List.fromList(
           utf8.encode("TEXT 10,${currentY},\"3\",0,1,1,\"$shopName\"\r\n")));
       currentY += 30;
 
-      // B. วันที่ & เวลา (มุมขวาบน) - ใช้ TEXT
       printData.add(Uint8List.fromList(
           utf8.encode("TEXT 240,${currentY},\"2\",1,1,1,\"DATE: $date\"\r\n")));
       currentY += 20;
       printData.add(Uint8List.fromList(
           utf8.encode("TEXT 240,${currentY},\"2\",1,1,1,\"TIME: $time\"\r\n")));
 
-      // C. หมายเลขตั๋ว (ซ้ายบน) - ใช้ TEXT
       printData.add(Uint8List.fromList(utf8.encode(
           "TEXT 10,${currentY},\"2\",0,1,1,\"TICKET NO: $ticketId\"\r\n")));
 
       currentY += 35;
 
-      // --- D. QR Code ข้อมูลจริง (ตรงกลางค่อนบน) ---
       printData.add(Uint8List.fromList(
           utf8.encode("QRCODE 100,${currentY},L,4,A,0,'$safeQrData'\r\n")));
       printData.add(
-          Uint8List.fromList(utf8.encode("DELAY 100\r\n"))); // หน่วงเวลา 100ms
+          Uint8List.fromList(utf8.encode("DELAY 100\r\n")));
 
-      currentY += 100; // เว้นพื้นที่ใต้ QR code (สูง 100 dots)
+      currentY += 100; 
 
-      // E. ประเภทตั๋ว (ใต้ QR Code, ชิดซ้าย) - ใช้ TEXT
       currentY += 20;
       printData.add(Uint8List.fromList(utf8.encode(
           "TEXT 10,${currentY},\"2\",0,1,1,\"TYPE: $ticketType\"\r\n")));
 
-      // F. หัวข้อ (RIDE TYPE) - ใช้ TEXT (ชิดขวา)
       printData.add(Uint8List.fromList(
           utf8.encode("TEXT 240,${currentY},\"2\",0,1,1,\"RIDE TYPE\"\r\n")));
 
-      currentY += 35; // ขยับลงก่อนเริ่มรายการเครื่องเล่น
+      currentY += 35; 
 
-      // G. ส่วนรายการเครื่องเล่น (ภาษาลาว - ใช้ BITMAP)
       if (rideList.isNotEmpty) {
-        // 1. หัวข้อรายการภาษาลาว (Bitmap)
         String laosHeader = "ລາຍການເຄື່ອງຫຼິ້ນ:";
         List<Uint8List> headerChunks = await _getBitmapChunks(
             laosHeader, 10, currentY,
@@ -247,7 +233,6 @@ class StickerPrinterService {
         printData.add(Uint8List.fromList(utf8.encode("DELAY 50\r\n")));
         currentY += 28;
 
-        // 2. รายการเครื่องเล่นแต่ละบรรทัด (Bitmap)
         for (String rideName in rideList) {
           List<Uint8List> rideChunks =
               await _getBitmapChunks("- $rideName", 15, currentY, fontSize: 16);
@@ -257,7 +242,6 @@ class StickerPrinterService {
         }
       }
 
-      // --- สั่งพิมพ์ (Chunk สุดท้าย) ---
       printData.add(Uint8List.fromList(utf8.encode("PRINT 1,1\r\n")));
 
       Uint8List finalData =
@@ -283,11 +267,10 @@ class StickerPrinterService {
     }
   }
 
-  // 💡 ฟังก์ชันใหม่สำหรับพิมพ์รูปภาพทั้งใบ (Print Image File)
   Future<void> printImageFile(
     Uint8List imageBytes, {
-    int x = 0, // ตำแหน่งเริ่มต้น (ซ้าย)
-    int y = 0, // ตำแหน่งเริ่มต้น (บน)
+    int x = 0, 
+    int y = 0,
     int maxWidthDots = 480, // ~60mm at 203dpi
     bool invertColors =
         true, // TSC BITMAP tends to invert; default to invert to keep white bg
@@ -357,7 +340,6 @@ class StickerPrinterService {
     }
   }
 
-  // 💡 ฟังก์ชัน Helper สำหรับแปลง Image Bytes เป็น TSPL Bitmap Chunks
   Future<List<Uint8List>> _getTsplBitmapFromImage(
     Uint8List imageBytes,
     int x,
@@ -374,7 +356,6 @@ class StickerPrinterService {
       ];
     }
 
-    // เติมพื้นหลังสีขาวเพื่อป้องกันส่วนโปร่งใสถูกแปลงเป็นสีดำบนสติกเกอร์
     final img.Image whiteBg = img.Image(
       width: dartImage.width,
       height: dartImage.height,
@@ -382,20 +363,16 @@ class StickerPrinterService {
     img.fill(whiteBg, color: img.ColorRgb8(255, 255, 255));
     img.compositeImage(whiteBg, dartImage);
 
-    // ถ้ากว้างเกินหน้ากระดาษ (เช่น 60mm = 480 dots @203dpi) ให้ย่อคงอัตราส่วน
     final img.Image scaledImage = whiteBg.width > maxWidthDots
         ? img.copyResize(whiteBg, width: maxWidthDots)
         : whiteBg;
 
-    // 1. แปลงเป็น Grayscale
     final img.Image monoImage = img.grayscale(scaledImage);
 
-    // 2. แปลงเป็น TSPL Binary Data
     final int imageWidth = monoImage.width;
     final int imageHeight = monoImage.height;
     final int widthBytes = (imageWidth + 7) ~/ 8;
 
-    // ใช้ compute เพื่อรันใน Isolate แยก
     final Uint8List bitmapBytes = await compute(_convertToTsplMonochrome, {
       'image': monoImage,
       'widthBytes': widthBytes,
@@ -405,7 +382,6 @@ class StickerPrinterService {
       'threshold': threshold,
     });
 
-    // 3. สร้างคำสั่ง TSPL BITMAP และส่ง Raw Data
     final String bitmapCommand = "BITMAP $x,$y,$widthBytes,$imageHeight,1,";
 
     return [
@@ -414,17 +390,15 @@ class StickerPrinterService {
     ];
   }
 
-  // 💡 [เมธอด Bitmap Helper] - ใช้ในการแปลงข้อความภาษาลาว
   Future<List<Uint8List>> _getBitmapChunks(
     String text,
     int x,
     int y, {
     double fontSize = 16,
     bool isBold = false,
-    double maxWidth = 380, // กว้างสูงสุดของสติกเกอร์ 60mm
+    double maxWidth = 380, 
     String fontFamily = 'Phetsarath_OT',
   }) async {
-    // 1. วาดข้อความบน Canvas (ใช้ Font ภาษาลาว)
     final ui.ParagraphBuilder paragraphBuilder = ui.ParagraphBuilder(
       ui.ParagraphStyle(
         textAlign: ui.TextAlign.left,
@@ -459,7 +433,6 @@ class StickerPrinterService {
       ];
     }
 
-    // 2. แปลง PNG/Image เป็น Grayscale
     final img.Image? dartImage = img.decodeImage(byteData.buffer.asUint8List());
     if (dartImage == null) {
       return [
@@ -470,12 +443,10 @@ class StickerPrinterService {
 
     final img.Image monoImage = img.grayscale(dartImage);
 
-    // 3. แปลงเป็น TSPL Binary Data ผ่าน compute
     final int imageWidth = monoImage.width;
     final int imageHeight = monoImage.height;
     final int widthBytes = (imageWidth + 7) ~/ 8;
 
-    // ใช้ compute เพื่อรันใน Isolate แยก
     final Uint8List bitmapBytes = await compute(_convertToTsplMonochrome, {
       'image': monoImage,
       'widthBytes': widthBytes,

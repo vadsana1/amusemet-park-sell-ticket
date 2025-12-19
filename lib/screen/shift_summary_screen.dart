@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 
-// Import Model และ Services ของคุณ
+// Import Models and Services
 import '../models/shift_report.dart';
 import '../services/close_shift_api.dart';
 import '../services/login_api.dart';
@@ -178,13 +178,13 @@ class _ShiftSummaryScreenState extends State<ShiftSummaryScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            // 1. กราฟวงกลม
+                            // 1. Pie chart
                             _buildSummaryCardFromApi(
                                 totalSales, adultSales, childSales),
 
                             const SizedBox(height: 20),
 
-                            // 2. ข้อมูลตั๋ว และ ผู้เข้าชม
+                            // 2. Ticket data and visitors
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -215,7 +215,7 @@ class _ShiftSummaryScreenState extends State<ShiftSummaryScreen> {
                       ),
                     ),
 
-                    // ปุ่มปิดรอบ
+                    // Close shift button
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
@@ -258,7 +258,7 @@ class _ShiftSummaryScreenState extends State<ShiftSummaryScreen> {
 
   // --- Widgets ---
 
-  // Summary Card using API data directly
+  // Summary card using API data directly
   Widget _buildSummaryCardFromApi(
       double totalSales, double adult, double child) {
     List<PieChartSectionData> sections = [];
@@ -372,7 +372,7 @@ class _ShiftSummaryScreenState extends State<ShiftSummaryScreen> {
     );
   }
 
-  // 1. กราฟ (เหมือนเดิม - kept for close shift popup)
+  // 1. Chart (kept for close shift popup)
   Widget _buildSummaryCard(ShiftReport data, double adult, double child) {
     List<PieChartSectionData> sections = [];
     if (adult == 0 && child == 0) {
@@ -515,7 +515,7 @@ class _ShiftSummaryScreenState extends State<ShiftSummaryScreen> {
     );
   }
 
-  // 2. Stat Card (เหมือนเดิม)
+  // 2. Stat card
   Widget _buildSimpleStatCard(
     String title,
     String value,
@@ -579,7 +579,7 @@ class _ShiftSummaryScreenState extends State<ShiftSummaryScreen> {
     );
   }
 
-  // 3. Visitor Card (เหมือนเดิม)
+  // 3. Visitor card
   Widget _buildVisitorDetailedCard(int adults, int children) {
     int total = adults + children;
     return Container(
@@ -709,7 +709,7 @@ class _ShiftSummaryScreenState extends State<ShiftSummaryScreen> {
     );
   }
 
-  // --- 4. Payment List Card (ใหม่: แสดงรายการทั้งหมด) ---
+  // --- 4. Payment list card (new: show all items) ---
   Widget _buildPaymentListCard(List<ReportPayment> payments) {
     return Container(
       decoration: BoxDecoration(
@@ -772,7 +772,7 @@ class _ShiftSummaryScreenState extends State<ShiftSummaryScreen> {
               itemBuilder: (context, index) {
                 final payment = payments[index];
 
-                // กำหนดไอคอนตาม Code
+                // Define icon based on code
                 IconData iconData;
                 Color iconColor;
                 Color iconBg;

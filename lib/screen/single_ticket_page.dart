@@ -5,20 +5,19 @@ import '../models/cart_item.dart';
 import '../models/payment_method.dart';
 import '../widgets/quantity_stepper.dart';
 
-typedef OnCheckoutCallback =
-    void Function(
-      List<CartItem> cart,
-      double totalPrice,
-      int adultQty,
-      int childQty,
-    );
+typedef OnCheckoutCallback = void Function(
+  List<CartItem> cart,
+  double totalPrice,
+  int adultQty,
+  int childQty,
+);
 
 class SingleTicketPage extends StatefulWidget {
   final Ticket? ticket;
   final List<PaymentMethod> paymentMethods;
   final void Function(Ticket ticket) onTicketSelected;
   final OnCheckoutCallback onCheckout;
-  // [เพิ่ม] รับ callback เพื่อส่งตะกร้าออกไป
+  // [Added] Receive callback to send cart out
   final Function(List<CartItem>) onCartChanged;
 
   const SingleTicketPage({
@@ -50,7 +49,7 @@ class _SingleTicketPageState extends State<SingleTicketPage> {
     _notifyCartChange();
   }
 
-  // [เพิ่ม] ฟังก์ชันส่งค่าตะกร้าออกแบบปลอดภัย (แก้จอแดง)
+  // [Added] Function to safely send cart value out (fixes red screen)
   void _notifyCartChange() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -59,7 +58,7 @@ class _SingleTicketPageState extends State<SingleTicketPage> {
     });
   }
 
-  // --- LOGIC เดิมของคุณ (Global Stepper, Add-only) ---
+  // --- ORIGINAL LOGIC (Global Stepper, Add-only) ---
   @override
   void didUpdateWidget(SingleTicketPage oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -67,7 +66,7 @@ class _SingleTicketPageState extends State<SingleTicketPage> {
       setState(() {
         var existingItem = _findItemInCart(widget.ticket!);
         if (existingItem == null) {
-          // Logic เดิม: ถ้าไม่มีให้ Add ใหม่
+          // Original logic: if not exists, add new
           _cart.add(
             CartItem(
               ticket: widget.ticket!,
@@ -78,7 +77,7 @@ class _SingleTicketPageState extends State<SingleTicketPage> {
           _calculateTotal();
         }
       });
-      // เรียก notify หลัง update เสร็จ (แก้จอแดงด้วย addPostFrameCallback ข้างใน)
+      // Call notify after update complete (fixes red screen with addPostFrameCallback inside)
       _notifyCartChange();
     }
   }
@@ -107,7 +106,7 @@ class _SingleTicketPageState extends State<SingleTicketPage> {
       _cart.remove(item);
       _calculateTotal();
     });
-    _notifyCartChange(); // แจ้งออกไปเมื่อลบ
+    _notifyCartChange(); // Notify when deleted
   }
 
   void _updateCart(String type, int change) {
@@ -124,7 +123,7 @@ class _SingleTicketPageState extends State<SingleTicketPage> {
       _cart.removeWhere((item) => item.totalQuantity <= 0);
       _calculateTotal();
     });
-    _notifyCartChange(); // แจ้งออกไปเมื่อแก้จำนวน
+    _notifyCartChange(); // Notify when edit quantity
   }
 
   @override
@@ -211,7 +210,7 @@ class _SingleTicketPageState extends State<SingleTicketPage> {
     );
   }
 
-  // Header และ CartRow ใช้โค้ดเดิมของคุณได้เลย
+  // Header and CartRow can use your original code
   Widget _buildCartHeader() {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),

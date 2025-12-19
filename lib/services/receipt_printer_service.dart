@@ -25,7 +25,7 @@ class ReceiptPrinterService {
   }
 
   // ---------------------------------------------------------------------------
-  // 🚀 เมธอดใหม่: พิมพ์รายงานสรุปกะ (Shift Report) - เพิ่มพารามิเตอร์
+  // 🚀 New Method: Print Shift Summary Report - Added Parameters
   // ---------------------------------------------------------------------------
   Future<void> printShiftReport({
     required String shiftId,
@@ -34,7 +34,7 @@ class ReceiptPrinterService {
     required String endDate,
     required String totalRevenue,
     required String totalTickets,
-    // 🟢 [เพิ่ม] พารามิเตอร์ที่หายไปตามที่ shift_report_popup ส่งมา
+    // 🟢 [Added] Missing parameters as sent by shift_report_popup
     required String adultSales,
     required String childSales,
     required String totalVisitors,
@@ -46,7 +46,7 @@ class ReceiptPrinterService {
     required String childrenPlayed,
   }) async {
     try {
-      // 1. หัวข้อ (จัดกลาง)
+      // 1. Title (centered)
       await iminPrinter.printText(
         'ລາຍງານສະຫຼຸບຮອບ',
         style: IminTextStyle(
@@ -57,7 +57,7 @@ class ReceiptPrinterService {
       );
       await iminPrinter.printText('--------------------------------');
 
-      // 2. ข้อมูลผู้ขายและกะ (จัดชิดซ้าย)
+      // 2. Seller and shift info (left aligned)
       await iminPrinter.printText(
         'ຜູ້ຂາຍ: $cashierName',
         style: IminTextStyle(fontSize: 12, align: IminPrintAlign.left),
@@ -68,7 +68,7 @@ class ReceiptPrinterService {
       );
       await iminPrinter.printText('--------------------------------');
 
-      // 3. ข้อมูลช่วงเวลา
+      // 3. Time period info
       await iminPrinter.printText(
         '--- ໄລຍະເວລາ ---',
         style: IminTextStyle(fontSize: 14, align: IminPrintAlign.center),
@@ -83,46 +83,46 @@ class ReceiptPrinterService {
       );
       await iminPrinter.printText('--------------------------------');
 
-      // 4. สรุปยอดขาย (ใช้ _printRow เพื่อจัดชิดซ้าย-ขวา)
+      // 4. Sales summary (use _printRow for left-right alignment)
 
       await iminPrinter.printText(
         '--- ຍອດຂາຍ (Sales) ---',
         style: IminTextStyle(fontSize: 14, align: IminPrintAlign.center),
       );
-      // ยอดขายรวม
-      await _printRow('ຍອດຂາຍທັງໝົດ:', '$totalRevenue ກີບ', isBold: true);
-      // ยอดขายแยกประเภท
+      // Total sales
+      await _printRow('ຍອດຂາຍທັງຫມົດ:', '$totalRevenue ກີບ', isBold: true);
+      // Sales by category
       await _printRow(' - ຜູ້ໃຫຍ່:', '$adultSales ກີບ');
       await _printRow(' - ເດັກນ້ອຍ:', '$childSales ກີບ');
 
       await iminPrinter.printText('--------------------------------');
 
-      // 5. สรุปจำนวนผู้เข้าชม
+      // 5. Visitor count summary
       await iminPrinter.printText(
         '--- ຈຳນວນປີ້ (Tickets) ---',
         style: IminTextStyle(fontSize: 14, align: IminPrintAlign.center),
       );
-      await _printRow('ລວມຈໍານວນປີ້ຂາຍ:', '$totalTickets ໃບ', isBold: true);
+      await _printRow('ລວມຈົານວນປີ້ຂາຍ:', '$totalTickets ໃບ', isBold: true);
       await _printRow(' - ຜູ້ໃຫຍ່:', '$adultVisitors ຄົນ');
       await _printRow(' - ເດັກນ້ອຍ:', '$childVisitors ຄົນ');
       await _printRow('ລວມຄົນເຂົ້າຊົມ:',
-          '$totalVisitors ຄົນ'); // ซ้ำกับด้านบน แต่เพิ่มความชัดเจน
+          '$totalVisitors ຄົນ'); // Duplicate from above but adds clarity
 
       await iminPrinter.printText('--------------------------------');
 
-      // 6. ช่องทางการชำระเงิน
+      // 6. Payment methods
       await iminPrinter.printText(
-        '--- ການຊໍາລະ ---',
+        '--- ການຊົາລະ ---',
         style: IminTextStyle(fontSize: 12, align: IminPrintAlign.center),
       );
       for (var p in payments) {
-        // p['method'] คือชื่อเต็ม, p['total'] คือยอด
+        // p['method'] is full name, p['total'] is amount
         await _printRow('${p['method']}:', '${p['total']} ກີບ', isBold: true);
       }
 
       await iminPrinter.printText('--------------------------------');
 
-      // 7. สรุปเครื่องเล่น
+      // 7. Rides summary
       await iminPrinter.printText(
         '--- ການຫຼິ້ນ (Rides) ---',
         style: IminTextStyle(fontSize: 12, align: IminPrintAlign.center),
@@ -144,27 +144,27 @@ class ReceiptPrinterService {
     }
   }
 
-// ... [printFinancialReceipt, printTicketStub, _printRow, _getVisibleLength เหมือนเดิม] ...
+// ... [printFinancialReceipt, printTicketStub, _printRow, _getVisibleLength same as before] ...
 
 // ---------------------------------------------------------------------------
-// เมธอดอื่นๆ ที่มีอยู่แล้ว
+// Other Existing Methods
 // ---------------------------------------------------------------------------
 
-  /// พิมพ์ใบสรุปการเงิน
+  /// Print Financial Summary Receipt
   Future<void> printFinancialReceipt(
     ApiTicketResponse response,
     String sellerName,
   ) async {
-// ... (โค้ด printFinancialReceipt เหมือนเดิม) ...
+// ... (code for printFinancialReceipt same as before) ...
     final DateTime now = DateTime.now();
     final String dateString = dateFormat.format(now);
     final String timeString = timeFormat.format(now);
 
     // ==========================================
-    // ส่วน Header: ชิดซ้าย วันที่/เวลา อยู่คนละบรรทัด
+    // Header Section: Left aligned, Date/Time on separate lines
     // ==========================================
 
-    // 1. เลขบิล (บรรทัดแรก)
+    // 1. Bill number (first line)
     await iminPrinter.printText(
       'ເລກທີໃບບິນ: ${response.purchaseId}',
       style: IminTextStyle(
@@ -174,7 +174,7 @@ class ReceiptPrinterService {
       ),
     );
 
-    // 2. วันที่ และ เวลา (อยู่บรรทัดเดียวกัน เว้นวรรค)
+    // 2. Date and Time (on same line with space)
     await iminPrinter.printText(
       'ວັນທີ: $dateString ເວລາ: $timeString',
       style: IminTextStyle(
@@ -183,7 +183,7 @@ class ReceiptPrinterService {
       ),
     );
 
-    // 3. ผู้ขาย (บรรทัดถัดมา)
+    // 3. Seller (next line)
     await iminPrinter.printText(
       'ຜູ້ຂາຍ: $sellerName',
       style: IminTextStyle(
@@ -192,44 +192,117 @@ class ReceiptPrinterService {
       ),
     );
 
+    // 4. Payment method
+    if (response.paymentMethods.isNotEmpty) {
+      // Convert method codes to Lao names
+      final displayMethods = response.paymentMethods.map((method) {
+        if (method == 'CASH') return 'ເງິນສົດ';
+        if (method == 'BANKTF') return 'ເງິນໂອນ';
+        if (method == 'QR') return 'QR';
+        return method;
+      }).join(", ");
+
+      await iminPrinter.printText(
+        'ຊ່ອງທາງຊຳລະເງິນ: $displayMethods',
+        style: IminTextStyle(
+          fontSize: 26,
+          align: IminPrintAlign.left,
+        ),
+      );
+    } else if (response.paymentDetails.isNotEmpty) {
+      // If paymentMethods is empty, extract from paymentDetails and convert names
+      List<String> methods = response.paymentDetails
+          .map((p) {
+            String methodCode = p['method']?.toString() ?? '';
+            if (methodCode == 'CASH') return 'ເງິນສົດ';
+            if (methodCode == 'BANKTF') return 'ເງິນໂອນ';
+            if (methodCode == 'QR') return 'QR';
+            return methodCode;
+          })
+          .where((m) => m.isNotEmpty)
+          .toList();
+      if (methods.isNotEmpty) {
+        await iminPrinter.printText(
+          'ຊ່ອງທາງຊຳລະເງິນ: ${methods.join(", ")}',
+          style: IminTextStyle(
+            fontSize: 26,
+            align: IminPrintAlign.left,
+          ),
+        );
+      }
+    }
+
     await iminPrinter.printText('------------------------------------------');
 
-    // --- รายละเอียดเงิน ---
-    // ใช้ _printRow ตัวใหม่ที่คำนวณแม่นยำขึ้น
+    // --- Payment details ---
     await _printRow(
-      'ລາຄາທັງໝົດ:',
+      'ລາຄາທັງຫມົດ:',
       '${currencyFormat.format(response.amountDue)} ກີບ',
-      isBold: true, // ตัวหนา -> จะใช้สูตรคำนวณสำหรับฟอนต์ใหญ่
+      isBold: true,
     );
+
     await _printRow(
       'ເງິນທີ່ໄດ້ຮັບ:',
       '${currencyFormat.format(response.amountPaid)} ກີບ',
-    ); // ปกติ -> ใช้สูตรฟอนต์ปกติ
-    await _printRow(
-      'ເງິນທອນ:',
-      '${currencyFormat.format(response.changeAmount)} ກີບ',
-    ); // ปกติ -> ใช้สูตรฟอนต์ปกติ
+    );
+
+    // 🟢 Check if payment is cash only
+    bool isCashOnly = response.paymentDetails.length == 1 &&
+        response.paymentDetails.first['method'] == 'CASH';
+
+    // Show detailed payment breakdown (only for mixed payment)
+    if (response.paymentDetails.length > 1) {
+      for (var payment in response.paymentDetails) {
+        String methodName = payment['method'] ?? '';
+        int amount = payment['amount'] ?? 0;
+
+        // Convert method name to Lao
+        String displayName = '';
+        if (methodName == 'CASH') {
+          displayName = 'ເງິນສົດ';
+        } else if (methodName == 'BANKTF') {
+          displayName = 'ເງິນໂອນ';
+        } else if (methodName == 'QR') {
+          displayName = 'QR';
+        } else {
+          displayName = methodName;
+        }
+
+        await _printRow(
+          '  • $displayName:',
+          '${currencyFormat.format(amount)} ກີບ',
+        );
+      }
+    }
+
+    // 🟢 Show change only for cash-only payment
+    if (isCashOnly) {
+      await _printRow(
+        'ເງິນທອນ:',
+        '${currencyFormat.format(response.changeAmount)} ກີບ',
+      );
+    }
 
     // --- Footer & Cut ---
     await iminPrinter.printAndFeedPaper(120);
     await iminPrinter.partialCut();
   }
 
-  /// พิมพ์ตั๋ว (Ticket Stub)
+  /// Print Ticket (Ticket Stub)
   Future<void> printTicketStub(
     ApiTicketResponse response,
     String sellerName,
   ) async {
-// ... (โค้ด printTicketStub เหมือนเดิม) ...
+// ... (code for printTicketStub same as before) ...
     final DateTime now = DateTime.now();
     final String dateString = dateFormat.format(now);
     final String timeString = timeFormat.format(now);
     String ticketTypeString;
 
     if (response.adultCount == 1) {
-      ticketTypeString = 'ຜູ້ໃຫຍ່ (Adult)';
+      ticketTypeString = 'ຜູ້ໃຫຍ່';
     } else if (response.childCount == 1) {
-      ticketTypeString = 'ເດັກນ້ອຍ (Child)';
+      ticketTypeString = 'ເດັກນ້ອຍ';
     } else {
       ticketTypeString = 'N/A';
     }
@@ -244,7 +317,7 @@ class ReceiptPrinterService {
     );
     await iminPrinter.printAndFeedPaper(20);
 
-    // --- Header Ticket ---
+    // --- Ticket Header ---
 
     // 1. ID
     await iminPrinter.printText(
@@ -256,19 +329,19 @@ class ReceiptPrinterService {
       ),
     );
 
-    // 2. วันที่ และ เวลา
+    // 2. Date and Time
     await iminPrinter.printText(
       'ວັນທີ: $dateString ເວລາ: $timeString',
       style: IminTextStyle(fontSize: 26, align: IminPrintAlign.left),
     );
 
-    // 3. ผู้ขาย
+    // 3. Seller
     await iminPrinter.printText(
       'ຜູ້ຂາຍ: $sellerName',
       style: IminTextStyle(fontSize: 26, align: IminPrintAlign.left),
     );
 
-    // 4. ประเภทตั๋ว
+    // 4. Ticket type
     await iminPrinter.printText(
       'ປະເພດປີ້: $ticketTypeString',
       style: IminTextStyle(fontSize: 26, align: IminPrintAlign.left),
@@ -299,31 +372,35 @@ class ReceiptPrinterService {
     await iminPrinter.partialCut();
   }
 
-  /// (Helper) ฟังก์ชันพิมพ์ 2 ฝั่ง แบบปรับขนาดอัตโนมัติ (Dynamic Align)
+  /// (Helper) Print 2-column aligned text (for 80mm paper)
   Future<void> _printRow(
     String label,
     String value, {
     bool isBold = false,
   }) async {
-    // -------------------------------------------------------------------
-    // [แก้ไขจุดสำคัญ] สูตรคำนวณพื้นที่
-    // - ถ้าตัวหนา (Size 24) ตัวหนังสือจะอ้วน กินที่เยอะ -> ให้ใช้แค่ 42 ช่อง
-    // - ถ้าตัวปกติ (Size 22) ตัวหนังสือจะผอมกว่า -> ให้ใช้ 52 ช่อง
-    // -------------------------------------------------------------------
-    int maxLineChars = isBold ? 42 : 52;
+    // Define fixed label width of 20 characters
+    const int labelWidth = 20;
+    const int totalWidth = 54;
 
-    int labelWidth = _getVisibleLength(label);
-    int valueWidth = _getVisibleLength(value);
+    // Calculate actual length (excluding Lao vowels)
+    int labelLen = _getVisibleLength(label);
+    int valueLen = _getVisibleLength(value);
 
-    int spaceCount = maxLineChars - (labelWidth + valueWidth);
+    // Pad label with spaces to reach labelWidth
+    int labelSpaces = labelWidth - labelLen;
+    if (labelSpaces < 0) labelSpaces = 0;
 
-    if (spaceCount < 1) spaceCount = 1;
+    String paddedLabel = label + (' ' * labelSpaces);
 
-    String spaces = ' ' * spaceCount;
-    String finalLine = '$label$spaces$value';
+    // Calculate space between label and value
+    int remainingWidth = totalWidth - labelWidth - valueLen;
+    if (remainingWidth < 1) remainingWidth = 1;
+
+    String spaces = ' ' * remainingWidth;
+    String line = '$paddedLabel$spaces$value';
 
     await iminPrinter.printText(
-      finalLine,
+      line,
       style: IminTextStyle(
         fontSize: isBold ? 24 : 22,
         align: IminPrintAlign.left,
@@ -332,9 +409,9 @@ class ReceiptPrinterService {
     );
   }
 
-  /// ฟังก์ชันช่วยนับความกว้าง (ตัดสระลาวออก)
   int _getVisibleLength(String text) {
     if (text.isEmpty) return 0;
+
     final laoNonSpacingRegex = RegExp(r'[\u0EB1\u0EB4-\u0EBC\u0EC8-\u0ECD]');
     String cleanText = text.replaceAll(laoNonSpacingRegex, '');
     return cleanText.length;

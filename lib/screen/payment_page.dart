@@ -32,39 +32,43 @@ class _PaymentPageState extends State<PaymentPage> {
   late TextEditingController _fullNameController;
   late TextEditingController _phoneController;
   String _selectedGender = 'male';
-  String _selectedVisitorType = 'adult'; // 🎯 [ແກ້ໄຂ] ເພີ່ມ State ນີ້
+  String _selectedVisitorType = 'adult';
   final NumberFormat _currencyFormat = NumberFormat("#,##0", "en_US");
-
-  void _selectInitialPaymentMethod(List<PaymentMethod> methods) {
-    if (methods.isNotEmpty) {
-      final cashMethod = methods.firstWhere(
-        (method) => method.code == 'CASH',
-        orElse: () => methods.first,
-      );
-      _selectedPaymentCode = cashMethod.code;
-    }
-  }
+  List<PaymentMethod> _allPaymentOptions = [];
 
   @override
   void initState() {
     super.initState();
-    _selectInitialPaymentMethod(widget.paymentMethods);
-
     _fullNameController = TextEditingController(text: 'customer');
     _phoneController = TextEditingController(text: '02012345678');
+
+    _setupPaymentOptions();
   }
 
   @override
   void didUpdateWidget(covariant PaymentPage oldWidget) {
     super.didUpdateWidget(oldWidget);
-
-    if (widget.paymentMethods.isNotEmpty &&
-        oldWidget.paymentMethods.isEmpty &&
-        _selectedPaymentCode == null) {
-      setState(() {
-        _selectInitialPaymentMethod(widget.paymentMethods);
-      });
+    
+    if (widget.paymentMethods != oldWidget.paymentMethods) {
+      _setupPaymentOptions();
     }
+  }
+
+  // [Added] Function to combine API buttons with Split button
+  void _setupPaymentOptions() {
+    setState(() {
+      // 1. Get list from API
+      _allPaymentOptions = List.from(widget.paymentMethods);
+
+      // 2. Select Default
+      if (_selectedPaymentCode == null && _allPaymentOptions.isNotEmpty) {
+        final cashMethod = _allPaymentOptions.firstWhere(
+          (m) => m.code == 'CASH',
+          orElse: () => _allPaymentOptions.first,
+        );
+        _selectedPaymentCode = cashMethod.code;
+      }
+    });
   }
 
   @override
@@ -94,7 +98,7 @@ class _PaymentPageState extends State<PaymentPage> {
     );
   }
 
-  // --- Widget: ສ່ວນສະຫຼຸບລາຍການ (ດ້ານซ้าย) ---
+  // ... (Widget _buildSummarySection, _buildSummaryHeader, _buildSummaryRow เหมือนเดิม ไม่ต้องแก้) ...
   Widget _buildSummarySection() {
     return Container(
       color: Colors.white,
@@ -155,25 +159,17 @@ class _PaymentPageState extends State<PaymentPage> {
           Expanded(flex: 1, child: Text('ລ/ດ', style: boldStyle)),
           Expanded(flex: 4, child: Text('ຊື່', style: boldStyle)),
           Expanded(
-            flex: 2,
-            child: Text(
-              'ຜູ້ໃຫຍ່',
-              style: boldStyle,
-              textAlign: TextAlign.center,
-            ),
-          ),
+              flex: 2,
+              child: Text('ຜູ້ໃຫຍ່',
+                  style: boldStyle, textAlign: TextAlign.center)),
           Expanded(
-            flex: 2,
-            child: Text(
-              'ເດັກນ້ອຍ',
-              style: boldStyle,
-              textAlign: TextAlign.center,
-            ),
-          ),
+              flex: 2,
+              child: Text('ເດັກນ້ອຍ',
+                  style: boldStyle, textAlign: TextAlign.center)),
           Expanded(
-            flex: 3,
-            child: Text('ລາຄາ', style: boldStyle, textAlign: TextAlign.right),
-          ),
+              flex: 3,
+              child:
+                  Text('ລາຄາ', style: boldStyle, textAlign: TextAlign.right)),
         ],
       ),
     );
@@ -187,30 +183,22 @@ class _PaymentPageState extends State<PaymentPage> {
           Expanded(flex: 1, child: Text((index + 1).toString())),
           Expanded(flex: 4, child: Text(item.ticket.ticketName)),
           Expanded(
-            flex: 2,
-            child: Text(
-              item.quantityAdult.toString(),
-              textAlign: TextAlign.center,
-            ),
-          ),
+              flex: 2,
+              child: Text(item.quantityAdult.toString(),
+                  textAlign: TextAlign.center)),
           Expanded(
-            flex: 2,
-            child: Text(
-              item.quantityChild.toString(),
-              textAlign: TextAlign.center,
-            ),
-          ),
+              flex: 2,
+              child: Text(item.quantityChild.toString(),
+                  textAlign: TextAlign.center)),
           Expanded(
-            flex: 3,
-            child: Text(
-              '${_currencyFormat.format(item.totalPrice)} ກີບ',
-              textAlign: TextAlign.right,
-            ),
-          ),
+              flex: 3,
+              child: Text('${_currencyFormat.format(item.totalPrice)} ກີບ',
+                  textAlign: TextAlign.right)),
         ],
       ),
     );
   }
+
 
   Widget _buildPaymentSection() {
     if (_selectedPaymentCode == null) {
@@ -218,8 +206,7 @@ class _PaymentPageState extends State<PaymentPage> {
         return const Center(child: CircularProgressIndicator());
       }
       return const Center(
-        child: Text('Error: ບໍ່ສາມາດເລືອກຊ່ອງທາງຊຳລະເງິນໄດ້'),
-      );
+          child: Text('Error: ບໍ່ສາມາດເລືອກຊ່ອງທາງຊຳລະເງິນໄດ້'));
     }
 
     return Padding(
@@ -236,91 +223,108 @@ class _PaymentPageState extends State<PaymentPage> {
                   fullNameController: _fullNameController,
                   phoneController: _phoneController,
                   initialGender: _selectedGender,
-                  onGenderChanged: (newValue) {
-                    setState(() {
-                      _selectedGender = newValue;
-                    });
-                  },
+                  onGenderChanged: (newValue) =>
+                      setState(() => _selectedGender = newValue),
                   initialVisitorType: _selectedVisitorType,
-                  onVisitorTypeChanged: (newType) {
-                    setState(() {
-                      _selectedVisitorType = newType;
-                    });
-                  },
+                  onVisitorTypeChanged: (newType) =>
+                      setState(() => _selectedVisitorType = newType),
                 ),
               ),
               Text(
                 'ຊຳລະເງິນ',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(context)
+                    .textTheme
+                    .headlineSmall
+                    ?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
+
+ 
               _buildPaymentTabs(),
+
               const SizedBox(height: 24),
             ],
           ),
           Expanded(
-            child: _selectedPaymentCode == 'CASH'
-                ? PaymentCashView(
-                    totalPrice: widget.totalPrice,
-                    cart: widget.cart,
-                    paymentMethodCode: _selectedPaymentCode!,
-                    visitorFullName: _fullNameController.text,
-                    visitorPhone: _phoneController.text,
-                    visitorGender: _selectedGender,
-                    globalAdultQty: widget.adultQty,
-                    globalChildQty: widget.childQty,
-                    visitorType:
-                        _selectedVisitorType,
-                  )
-                : PaymentQrView(
-                    totalPrice: widget.totalPrice,
-                    cart: widget.cart,
-                    paymentMethodCode: _selectedPaymentCode!,
-                    visitorFullName: _fullNameController.text,
-                    visitorPhone: _phoneController.text,
-                    visitorGender: _selectedGender,
-                    globalAdultQty: widget.adultQty,
-                    globalChildQty: widget.childQty,
-                    visitorType:
-                        _selectedVisitorType, 
-                  ),
+   
+            child: _buildSelectedPaymentView(),
           ),
         ],
       ),
     );
   }
 
+  
+  Widget _buildSelectedPaymentView() {
+    switch (_selectedPaymentCode) {
+      case 'CASH':
+        return PaymentCashView(
+          totalPrice: widget.totalPrice,
+          cart: widget.cart,
+          paymentMethodCode: _selectedPaymentCode!,
+          visitorFullName: _fullNameController.text,
+          visitorPhone: _phoneController.text,
+          visitorGender: _selectedGender,
+          globalAdultQty: widget.adultQty,
+          globalChildQty: widget.childQty,
+          visitorType: _selectedVisitorType,
+        );
+
+      default:
+        return PaymentQrView(
+          totalPrice: widget.totalPrice,
+          cart: widget.cart,
+          paymentMethodCode: _selectedPaymentCode!,
+          visitorFullName: _fullNameController.text,
+          visitorPhone: _phoneController.text,
+          visitorGender: _selectedGender,
+          globalAdultQty: widget.adultQty,
+          globalChildQty: widget.childQty,
+          visitorType: _selectedVisitorType,
+        );
+    }
+  }
+
+ 
   Widget _buildPaymentTabs() {
-    if (widget.paymentMethods.isEmpty) {
+    if (_allPaymentOptions.isEmpty) {
       return const SizedBox.shrink();
     }
 
-    final isSelected = widget.paymentMethods.map((method) {
+    final isSelected = _allPaymentOptions.map((method) {
       return method.code == _selectedPaymentCode;
     }).toList();
 
-    final children = widget.paymentMethods.map((method) {
+    final children = _allPaymentOptions.map((method) {
       return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-        child: Text(method.name),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Text(
+          method.name,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+              fontSize: 14), 
+        ),
       );
     }).toList();
 
     return Center(
-      child: ToggleButtons(
-        isSelected: isSelected,
-        onPressed: (index) {
-          setState(() {
-            _selectedPaymentCode = widget.paymentMethods[index].code;
-          });
-        },
-        borderRadius: BorderRadius.circular(8),
-        selectedBorderColor: const Color(0xFF1A9A8B),
-        selectedColor: Colors.white,
-        fillColor: const Color(0xFF1A9A8B),
-        children: children,
+      child: SingleChildScrollView(
+       
+        scrollDirection: Axis.horizontal,
+        child: ToggleButtons(
+          isSelected: isSelected,
+          onPressed: (index) {
+            setState(() {
+              _selectedPaymentCode = _allPaymentOptions[index].code;
+            });
+          },
+          borderRadius: BorderRadius.circular(8),
+          selectedBorderColor: const Color(0xFF1A9A8B),
+          selectedColor: Colors.white,
+          fillColor: const Color(0xFF1A9A8B),
+
+          children: children,
+        ),
       ),
     );
   }

@@ -15,7 +15,7 @@ class PaymentApi {
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> jsonResponse = json.decode(response.body);
-        // ຢືນຢັນວ່າ 'data' ເປັນ List
+
         final List<dynamic> data = jsonResponse['data'] as List<dynamic>;
 
         return data
@@ -27,7 +27,6 @@ class PaymentApi {
         );
       }
     } catch (e) {
-      // ໂຍນ Exception ທີ່ສື່ຄວາມໝາຍວ່າເຊື່ອມຕໍ່ບໍ່ໄດ້
       throw Exception('Failed to connect to the server or process data: $e');
     }
   }

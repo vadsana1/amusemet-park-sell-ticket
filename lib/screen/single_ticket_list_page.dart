@@ -6,7 +6,7 @@ import '../services/ticket_api.dart';
 
 class SingleTicketListPage extends StatefulWidget {
   final Ticket? selectedTicket;
-  final List<CartItem> cart; // รับตะกร้าเข้ามาเพื่อเช็คสถานะ
+  final List<CartItem> cart; // Receive cart to check status
   final void Function(Ticket ticket) onTicketSelected;
 
   const SingleTicketListPage({
@@ -38,14 +38,13 @@ class _SingleTicketListPageState extends State<SingleTicketListPage> {
         if (snapshot.connectionState == ConnectionState.waiting)
           return const Center(child: CircularProgressIndicator());
         if (snapshot.hasError)
-          return Center(child: Text('เกิดข้อผิดพลาด: ${snapshot.error}'));
+          return Center(child: Text('Error: ${snapshot.error}'));
         if (!snapshot.hasData || snapshot.data!.isEmpty)
-          return const Center(child: Text('ไม่พบข้อมูลตั๋ว'));
+          return const Center(child: Text('No ticket data found'));
 
         final List<Ticket> allTickets = snapshot.data!;
-        final List<Ticket> ticketList = allTickets
-            .where((ticket) => ticket.type == 'single')
-            .toList();
+        final List<Ticket> ticketList =
+            allTickets.where((ticket) => ticket.type == 'single').toList();
 
         return GridView.builder(
           padding: const EdgeInsets.all(16.0),
@@ -59,22 +58,22 @@ class _SingleTicketListPageState extends State<SingleTicketListPage> {
           itemBuilder: (context, index) {
             final ticket = ticketList[index];
 
-            // 1. เช็คว่าอยู่ในตะกร้าไหม
+            // 1. Check if already in cart
             final bool alreadyInCart = widget.cart.any(
               (item) => item.ticket.ticketId == ticket.ticketId,
             );
-            // 2. เช็คว่าเป็นตัวที่เลือกอยู่ไหม
+            // 2. Check if currently selected
             final bool isSelected =
                 widget.selectedTicket?.ticketId == ticket.ticketId;
 
-            // 3. ปรับ UI: ถ้าอยู่ในตะกร้าแล้ว ให้จางลง และกดไม่ได้
+            // 3. Adjust UI: if already in cart, dim it and disable tap
             return Opacity(
               opacity: alreadyInCart ? 0.5 : 1.0,
               child: TicketCard(
                 ticket: ticket,
                 isSelected: isSelected,
                 onTap: alreadyInCart
-                    ? null // กดไม่ได้ถ้าเลือกไปแล้ว
+                    ? null // Cannot tap if already selected
                     : () => widget.onTicketSelected(ticket),
               ),
             );

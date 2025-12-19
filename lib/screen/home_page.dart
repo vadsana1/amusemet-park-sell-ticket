@@ -30,7 +30,7 @@ class _HomePageState extends State<HomePage> {
   final PaymentApi _paymentApi = PaymentApi();
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
-  // Key สำหรับสั่งเคลียร์ค่าในหน้า SingleTicketPage (หน้าขวา)
+  // Key for clearing values in SingleTicketPage (right side)
   final GlobalKey<State<SingleTicketPage>> _ticketPageStateKey = GlobalKey();
 
   // State Variables
@@ -40,7 +40,7 @@ class _HomePageState extends State<HomePage> {
   bool _isLoadingMethods = true;
   String? _currentUserId;
 
-  // [สำคัญ] ตัวแปรเก็บตะกร้าปัจจุบัน เพื่อส่งไปให้หน้า List ทางซ้ายเช็คสถานะ
+  // [Important] Variable to store current cart to send to List page on left to check status
   List<CartItem> _currentCart = [];
 
   @override
@@ -52,7 +52,7 @@ class _HomePageState extends State<HomePage> {
     StickerPrinterService.instance.autoConnectOnStartup();
   }
 
-  // โหลด User ID จาก Storage
+  // Load User ID from Storage
   Future<void> _loadUserId() async {
     final id = await _storage.read(key: 'user_id');
     if (mounted) {
@@ -62,7 +62,7 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  // โหลดวิธีการชำระเงิน
+  // Load payment methods
   Future<void> _loadPaymentMethods() async {
     setState(() => _isLoadingMethods = true);
     try {
@@ -86,36 +86,36 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  // เปลี่ยนเมนูแถบซ้ายสุด (Ticket, Package, Shift, User)
+  // Change left menu (Ticket, Package, Shift, User)
   void _onMenuItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
 
-      // รีเซ็ตค่าเมื่อเปลี่ยนหน้า
+      // Reset values when changing page
       _selectedTicket = null;
-      _currentCart.clear(); // เคลียร์ตะกร้าในความจำของ Home
+      _currentCart.clear(); // Clear cart in Home memory
 
-      // สั่งเคลียร์ค่าใน SingleTicketPage (ถ้าคีย์ยังอยู่)
+      // Clear values in SingleTicketPage (if key still exists)
       (_ticketPageStateKey.currentState as dynamic)?.clearAllState();
     });
   }
 
-  // เมื่อเลือกตั๋วจากหน้า List ทางซ้าย
+  // When ticket is selected from List page on left
   void _onTicketSelected(Ticket ticket) {
     setState(() {
       _selectedTicket = ticket;
     });
   }
 
-  // [สำคัญ] ฟังก์ชันรับค่าเมื่อตะกร้าในหน้าขวามีการเปลี่ยนแปลง
+  // [Important] Function to receive value when cart on right page changes
   void _handleCartChanged(List<CartItem> newCart) {
-    // อัปเดต State เพื่อส่งต่อให้หน้าซ้าย (SingleTicketListPage) รับรู้
+    // Update State to pass to left page (SingleTicketListPage) to be aware
     setState(() {
       _currentCart = newCart;
     });
   }
 
-  // เริ่มกระบวนการชำระเงิน
+  // Start payment process
   void _startPaymentProcess(
     List<CartItem> cart,
     double totalPrice,
@@ -125,7 +125,7 @@ class _HomePageState extends State<HomePage> {
     if (cart.isEmpty) return;
     if (!mounted) return;
 
-    // ไปหน้า PaymentPage
+    // Go to PaymentPage
     final bool? resetFlag = await Navigator.push(
       context,
       MaterialPageRoute(
@@ -139,7 +139,7 @@ class _HomePageState extends State<HomePage> {
       ),
     );
 
-    // ถ้าจ่ายเงินสำเร็จ (ได้ค่า true กลับมา) ให้เคลียร์ค่าทั้งหมด
+    // If payment successful (returns true) clear all values
     if (resetFlag == true) {
       (_ticketPageStateKey.currentState as dynamic)?.clearAllState();
       setState(() {
@@ -149,48 +149,49 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  // ส่วนแสดงผลเนื้อหาหลัก ตามเมนูที่เลือก
+  // Main content display section, according to selected menu
   Widget _buildCurrentPage() {
     if (_isLoadingMethods) {
       return const Center(child: CircularProgressIndicator());
     }
 
     switch (_selectedIndex) {
-      case 0: // หน้าขายตั๋วรายใบ (Single Ticket)
+      case 0: // Single Ticket Sales page
         return Row(
           children: [
-            // ส่วนแสดงรายการตั๋ว (ซ้าย)
+            // Ticket list display section (left)
             Expanded(
               flex: 3,
               child: SingleTicketListPage(
                 onTicketSelected: _onTicketSelected,
                 selectedTicket: _selectedTicket,
                 cart:
-                    _currentCart, // ส่งตะกร้าไปเพื่อเช็คว่าตั๋วไหนเลือกแล้วให้จางลง
+                    _currentCart, // Send cart to check which tickets are selected to dim
               ),
             ),
-            // ส่วนจัดการจำนวนและราคา (ขวา)
+            // Quantity and price management section (right)
             SingleTicketPage(
               key: _ticketPageStateKey,
               ticket: _selectedTicket,
               paymentMethods: _paymentMethods,
               onTicketSelected: _onTicketSelected,
               onCheckout: _startPaymentProcess,
-              onCartChanged: _handleCartChanged, // รับค่าตะกร้ากลับมาอัปเดต
+              onCartChanged:
+                  _handleCartChanged, // Receive cart values back to update
             ),
           ],
         );
 
-      case 1: // หน้าตั๋วชุด (Package)
+      case 1: // Package Ticket page
         return const PackageTicketPage();
 
-      case 2: // หน้าสรุปยอด (Shift Summary)
+      case 2: // Shift Summary page
         if (_currentUserId == null) {
           return const Center(child: CircularProgressIndicator());
         }
         return ShiftSummaryScreen(userId: _currentUserId!);
 
-      case 3: // หน้าผู้ใช้งาน (User Profile)
+      case 3: // User Profile page
         return const UserPage();
 
       default:
@@ -205,19 +206,19 @@ class _HomePageState extends State<HomePage> {
       body: SafeArea(
         child: Column(
           children: [
-            // ส่วนหัวด้านบน
+            // Header section at top
             const HomePageHeader(),
 
-            // พื้นที่เนื้อหาหลัก
+            // Main content area
             Expanded(
               child: Row(
                 children: [
-                  // เมนูแถบซ้ายสุด
+                  // Left menu bar
                   SideMenu(
                     selectedIndex: _selectedIndex,
                     onMenuItemTapped: _onMenuItemTapped,
                   ),
-                  // เนื้อหาที่เปลี่ยนไปตามเมนู
+                  // Content that changes according to menu
                   Expanded(child: _buildCurrentPage()),
                 ],
               ),

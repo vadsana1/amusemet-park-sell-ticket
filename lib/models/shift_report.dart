@@ -4,13 +4,13 @@ import 'dart:developer';
 
 double _safeParseDouble(dynamic value) {
   if (value == null) return 0.0;
-  // แปลง String ที่มีลูกน้ำ (เช่น "1,940,000.00") ให้เป็น double
+  // Convert String with commas (e.g. "1,940,000.00") to double
   return double.tryParse(value.toString().replaceAll(',', '')) ?? 0.0;
 }
 
 int _safeParseInt(dynamic value) {
   if (value == null) return 0;
-  // แปลงเป็น int และจัดการกรณีทศนิยมถ้ามี
+  // Convert to int and handle decimal cases if present
   if (value is double) return value.toInt();
   return int.tryParse(value.toString().split('.').first) ?? 0;
 }
@@ -25,7 +25,7 @@ String _safeParseString(dynamic value) {
 class ShiftReport {
   final ReportUser user;
   final ReportSales sales;
-  final List<ReportPayment> payments; // เก็บรายการ Bank Transfer, Cash ที่นี่
+  final List<ReportPayment> payments; // Store Bank Transfer, Cash list here
   final ReportRides rides;
   final ReportVisitors visitors;
   final String closedAt;
@@ -130,7 +130,7 @@ class ReportSales {
   }
 }
 
-// Model สำหรับ Payment (Bank, Cash)
+// Model for Payment (Bank, Cash)
 class ReportPayment {
   final String method;
   final String code;
@@ -146,7 +146,7 @@ class ReportPayment {
     return ReportPayment(
       method: _safeParseString(map['method']),
       code: _safeParseString(map['code']),
-      // ใช้ _safeParseDouble เพื่อรองรับค่า "1,940,000.00"
+      // Use _safeParseDouble to support values like "1,940,000.00"
       total: _safeParseDouble(map['total']),
     );
   }

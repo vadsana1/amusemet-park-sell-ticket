@@ -16,7 +16,7 @@ class ThemeParkProfile {
   final String? closingTime;
   final String? timezone;
   final String? currency;
-  final String? picture; // นี่คือ Logo URL
+  final String? picture; // This is the Logo URL
   final bool isActive;
 
   ThemeParkProfile({
@@ -41,7 +41,7 @@ class ThemeParkProfile {
     required this.isActive,
   });
 
-  // Factory สำหรับแปลง JSON object (ส่วนของ "data") มาเป็น Class
+  // Factory to convert JSON object ("data" section) to Class
   factory ThemeParkProfile.fromJson(Map<String, dynamic> json) {
     return ThemeParkProfile(
       parkId: json['park_id'] ?? 0,
@@ -61,8 +61,8 @@ class ThemeParkProfile {
       closingTime: json['closing_time'],
       timezone: json['timezone'],
       currency: json['currency'],
-      picture: json['picture'], // Map ตรงกับ JSON key "picture"
-      // แปลงเป็น bool อย่างปลอดภัย (กรณี API ส่งมาเป็น 1/0 หรือ true/false)
+      picture: json['picture'], // Maps to JSON key "picture"
+      // Safely convert to bool (in case API sends 1/0 or true/false)
       isActive: json['is_active'] == true || json['is_active'] == 1,
     );
   }

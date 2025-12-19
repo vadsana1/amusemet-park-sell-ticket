@@ -231,8 +231,6 @@ class _PaymentQrViewState extends State<PaymentQrView> {
         );
       }
 
-     
-
       if (!mounted) return;
 
       final bool? receiptResult = await Navigator.push(
@@ -278,67 +276,62 @@ class _PaymentQrViewState extends State<PaymentQrView> {
     return Column(
       children: [
         Expanded(
-          child: Center(
-            child: Form(
-              key: _formKey,
-              child: SingleChildScrollView(
-                child: Padding(
-                  padding: const EdgeInsets.all(24.0),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      TextFormField(
-                        controller: _referenceIdController,
-                        decoration: const InputDecoration(
-                          labelText: 'ປ້ອນເລກທີອ້າງ/reference ID',
-                          hintText: 'ປ້ອນເລກທີອ້າງ',
-                          border: OutlineInputBorder(),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'ກະລຸນາປ້ອນເລກທີອ້າງ';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _bankBillNumberController,
-                        decoration: const InputDecoration(
-                          labelText: 'ເລກທີອ້າງອີງ2',
-                          hintText: 'ປ້ອນເລກທ້າຍ 5 ຕົວ',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                      const SizedBox(height: 32),
-
-                      // ส่วนแสดง QR บนจอพนักงาน (หน้าจอนี้)
-                      // ถ้าอยากแสดงรูปบัญชีตรงนี้ด้วย ให้เปลี่ยน Icon เป็น Image.asset('assets/images/bank_qr_cropped.jpg')
-                      Icon(
-                        Icons.qr_code_scanner,
-                        size: 100,
-                        color: Colors.grey[700],
-                      ),
-
-                      const SizedBox(height: 20),
-                      const Text(
-                        "ຈຳນວນເງິນທີ່ຕ້ອງຊຳລະ:",
-                        style: TextStyle(fontSize: 18),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.all(8.0),
-                        child: Text(
-                          '${currencyFormat.format(widget.totalPrice)} กีบ',
-                          style: const TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF1A9A8B),
-                          ),
-                        ),
-                      ),
-                    ],
+          child: Form(
+            key: _formKey,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                children: [
+                  TextFormField(
+                    controller: _referenceIdController,
+                    decoration: const InputDecoration(
+                      labelText: 'ປ້ອນເລກທີອ້າງ/reference ID',
+                      hintText: 'ປ້ອນເລກທີອ້າງ',
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'ກະລຸນາປ້ອນເລກທີອ້າງ';
+                      }
+                      return null;
+                    },
                   ),
-                ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _bankBillNumberController,
+                    decoration: const InputDecoration(
+                      labelText: 'ເລກທີອ້າງອີງ2',
+                      hintText: 'ປ້ອນເລກທ້າຍ 5 ຕົວ',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+
+                  // ส่วนแสดง QR บนจอพนักงาน (หน้าจอนี้)
+                  // ถ้าอยากแสดงรูปบัญชีตรงนี้ด้วย ให้เปลี่ยน Icon เป็น Image.asset('assets/images/bank_qr_cropped.jpg')
+                  Icon(
+                    Icons.qr_code_scanner,
+                    size: 100,
+                    color: Colors.grey[700],
+                  ),
+
+                  const SizedBox(height: 20),
+                  const Text(
+                    "ຈຳນວນເງິນທີ່ຕ້ອງຊຳລະ:",
+                    style: TextStyle(fontSize: 18),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Text(
+                      '${currencyFormat.format(widget.totalPrice)} กีบ',
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1A9A8B),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),

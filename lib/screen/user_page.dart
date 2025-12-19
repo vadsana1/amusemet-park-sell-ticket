@@ -19,7 +19,7 @@ class _UserPageState extends State<UserPage> {
   String _userId = '';
   String _appVersion = '...'; // App version from pubspec
 
-  // สีหลักของแอป (Teal/Green tone)
+  // Primary app color (Teal/Green tone)
   final Color _primaryColor = const Color(0xFF1A9A8B);
 
   @override
@@ -56,9 +56,9 @@ class _UserPageState extends State<UserPage> {
     ).push(MaterialPageRoute(builder: (context) => const UserManualScreen()));
   }
 
-  // --- ฟังก์ชันออกจากระบบ (ภาษาลาว) ---
+  // --- Logout function ---
   Future<void> _logout() async {
-    // 1. แสดง Dialog ยืนยัน
+    // 1. Show confirmation dialog
     final bool? confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -88,11 +88,11 @@ class _UserPageState extends State<UserPage> {
 
     if (confirm == true) {
       try {
-        // 2. เรียก logout API
+        // 2. Call logout API
         await _loginApi.logout();
 
         if (mounted) {
-          // 3. กลับไปหน้า Login
+          // 3. Return to login page
           Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(builder: (context) => const LoginPage()),
             (route) => false,
@@ -131,7 +131,7 @@ class _UserPageState extends State<UserPage> {
           children: [
             const SizedBox(height: 20),
 
-            // --- 1. ส่วนแสดงข้อมูลผู้ใช้ (Profile Card) ---
+            // --- 1. User profile display section (Profile Card) ---
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Container(
@@ -200,7 +200,7 @@ class _UserPageState extends State<UserPage> {
 
             const SizedBox(height: 30),
 
-            // --- 2. ส่วนเมนู (Menu Section) ---
+            // --- 2. Menu section ---
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Column(
@@ -239,7 +239,7 @@ class _UserPageState extends State<UserPage> {
 
                   const SizedBox(height: 24),
 
-                  // --- ปุ่มออกจากระบบ ---
+                  // --- Logout button ---
                   Container(
                     decoration: BoxDecoration(
                       color: Colors.white,

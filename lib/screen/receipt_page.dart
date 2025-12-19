@@ -6,16 +6,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-// --- เพิ่ม Imports สำหรับการ Capture Widget ---
+// --- Add Imports for Widget Capture ---
 import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
 import 'dart:typed_data';
 // ----------------------------------------------
 
-// 1. Import Model และ Service
+// 1. Import Model and Service
 import '../models/api_ticket_response.dart';
-import '../services/receipt_printer_service.dart'; // ของ iMin (ใบเสร็จการเงิน)
-import '../services/sticker_printer_service.dart'; // ของเครื่องปริ้นสติกเกอร์ (ตั๋วเข้าชม)
+import '../services/receipt_printer_service.dart'; // for iMin (Financial Receipt)
+import '../services/sticker_printer_service.dart'; // for Sticker Printer (Entrance Tickets)
 
 class ReceiptPage extends StatefulWidget {
   final List<ApiTicketResponse> responses;
@@ -29,16 +29,16 @@ class ReceiptPage extends StatefulWidget {
 class _ReceiptPageState extends State<ReceiptPage> {
   static const bool _isIminEnabled = true;
 
-  // 🟢 [1] Global Key List: สำหรับจับภาพ Widget ตั๋วแต่ละใบ
+  // 🟢 [1] Global Key List: for capturing each ticket widget
   final Map<int, GlobalKey> _ticketKeys = {};
 
-  // Service สำหรับการพิมพ์
+  // Services for printing
   final ReceiptPrinterService _iminService =
-      ReceiptPrinterService(); // จัดการ iMin
-  final StickerPrinterService _ticketService =
-      StickerPrinterService.instance; // จัดการ Sticker Printer (ใช้ instance)
+      ReceiptPrinterService(); // manages iMin printer
+  final StickerPrinterService _ticketService = StickerPrinterService
+      .instance; // manages Sticker Printer (using instance)
 
-  // Storage สำหรับดึงชื่อผู้ขาย
+  // Storage for retrieving seller name
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
   String _sellerName = 'Loading...';
 
@@ -56,12 +56,12 @@ class _ReceiptPageState extends State<ReceiptPage> {
     super.initState();
     _loadSellerName();
 
-    // 🟢 [2] สร้าง GlobalKey สำหรับตั๋วทุกใบใน Responses
+    // 🟢 [2] Create GlobalKey for each ticket in Responses
     for (int i = 0; i < widget.responses.length; i++) {
       _ticketKeys[i] = GlobalKey();
     }
 
-    // เช็คก่อน Init เครื่อง iMin ถ้าปิดอยู่ให้ข้ามไปเลย (กันค้างบน Emulator)
+    // Check before Init iMin printer, skip if disabled (prevent hanging on Emulator)
     if (_isIminEnabled) {
       _initIminPrinter();
     } else {
@@ -86,7 +86,7 @@ class _ReceiptPageState extends State<ReceiptPage> {
   // Core Capture Logic
   // ---------------------------------------------------------------------------
 
-  // 🟢 [3] ฟังก์ชันสำหรับจับภาพ Widget ด้วย Global Key
+  // 🟢 [3] Function to capture Widget as bytes using Global Key
   Future<Uint8List?> _captureWidgetToBytes(int index) async {
     final GlobalKey? key = _ticketKeys[index];
     if (key == null || key.currentContext == null) {
@@ -95,13 +95,13 @@ class _ReceiptPageState extends State<ReceiptPage> {
     }
 
     try {
-      // ให้แน่ใจว่า Widget ถูกวาดเสร็จก่อนจับภาพ
+      // Ensure the Widget is fully rendered before capturing
       await Future.microtask(() {});
 
       final RenderRepaintBoundary boundary =
           key.currentContext!.findRenderObject() as RenderRepaintBoundary;
 
-      // 🚨 ใช้ pixelRatio สูง (เช่น 3.0) เพื่อให้ภาพคมชัดขึ้นเมื่อย่อพิมพ์
+      // 🚨 Use high pixelRatio (e.g. 3.0) for sharper image when scaled for printing
       final ui.Image image = await boundary.toImage(pixelRatio: 3.0);
       final ByteData? byteData =
           await image.toByteData(format: ui.ImageByteFormat.png);
@@ -122,7 +122,7 @@ class _ReceiptPageState extends State<ReceiptPage> {
     log("Starting dual print job...");
 
     // =========================================================================
-    // ส่วนที่ 1: เครื่อง iMin (พิมพ์ใบเสร็จรับเงิน)
+    // Part 1: iMin Printer (Print Financial Receipt)
     // =========================================================================
     if (_isIminEnabled) {
       try {
@@ -144,7 +144,7 @@ class _ReceiptPageState extends State<ReceiptPage> {
     }
 
     // =========================================================================
-    // 🟢 [4] ส่วนที่ 2: เครื่อง Sticker Printer (พิมพ์รูปภาพตั๋ว)
+    // 🟢 [4] Part 2: Sticker Printer (Print Ticket Images)
     // =========================================================================
     try {
       log("Starting capture and print job for ${widget.responses.length} tickets...");
@@ -152,12 +152,12 @@ class _ReceiptPageState extends State<ReceiptPage> {
       for (int i = 0; i < widget.responses.length; i++) {
         log("Capturing and printing ticket ${i + 1}/${widget.responses.length}...");
 
-        // 1. จับภาพ Widget เป็น Bytes
+        // 1. Capture Widget as Bytes
         final Uint8List? imageBytes = await _captureWidgetToBytes(i);
 
         if (imageBytes != null) {
-          // 2. สั่งพิมพ์รูปภาพทั้งใบ (โดยใช้ฟังก์ชันใน Service)
-          // ใช้ 0, 0 เพื่อให้ภาพเริ่มพิมพ์ที่มุมซ้ายบนของสติกเกอร์
+          // 2. Print the entire image (using Service function)
+          // Use 0, 0 to start printing from top-left corner of sticker
           await _ticketService.printImageFile(
             imageBytes,
             x: 0,
@@ -165,7 +165,7 @@ class _ReceiptPageState extends State<ReceiptPage> {
             maxWidthDots: 480,
           );
 
-          // หน่วงเวลาเพื่อให้เครื่องพิมพ์ประมวลผล Bitmap ก่อนใบถัดไป
+          // Delay to allow printer to process Bitmap before next ticket
           await Future.delayed(const Duration(milliseconds: 700));
         } else {
           log("Skipped printing ticket ${i + 1}: Failed to capture image.");
@@ -184,7 +184,7 @@ class _ReceiptPageState extends State<ReceiptPage> {
 
     log("Print job complete.");
 
-    // ปิดหน้าจอเมื่อทำงานเสร็จ
+    // Close screen when work is complete
     if (mounted) {
       Navigator.of(context).pop(true);
     }
@@ -219,13 +219,13 @@ class _ReceiptPageState extends State<ReceiptPage> {
           child: Column(
             children: [
               const SizedBox(height: 24),
-              // UI: ใบสรุปการเงิน (ยังคงเดิม)
+              // UI: Financial Summary Receipt (unchanged)
               _buildFinancialReceipt(financialResponse),
               const SizedBox(height: 24),
-              // UI: ตั๋วทั้งหมด (แก้ไข Layout ภายใน)
+              // UI: All Tickets (modified layout inside)
               _buildTicketStubsWrap(widget.responses),
               const SizedBox(height: 24),
-              // UI: ปุ่มพิมพ์
+              // UI: Print Button
               _buildPrintButton(),
               const SizedBox(height: 24),
             ],
@@ -264,6 +264,10 @@ class _ReceiptPageState extends State<ReceiptPage> {
   }
 
   Widget _buildFinancialReceipt(ApiTicketResponse response) {
+    // Check if payment is cash only
+    bool isCashOnly = response.paymentDetails.length == 1 &&
+        response.paymentDetails.first['method'] == 'CASH';
+
     return Container(
       width: 400,
       padding: const EdgeInsets.all(24),
@@ -273,7 +277,13 @@ class _ReceiptPageState extends State<ReceiptPage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           _buildHeader(response, isFinancialReceipt: true),
-          const SizedBox(height: 10),
+
+          // 🟢 Divider line
+          const SizedBox(height: 12),
+          const Divider(thickness: 1, color: Colors.black26),
+          const SizedBox(height: 12),
+
+          // Price section
           _buildInfoRow(
             'ລາຄາທັງໝົດ:',
             '${currencyFormat.format(response.amountDue)} ກີບ',
@@ -284,18 +294,69 @@ class _ReceiptPageState extends State<ReceiptPage> {
             'ເງິນທີ່ໄດ້ຮັບ:',
             '${currencyFormat.format(response.amountPaid)} ກີບ',
           ),
-          const SizedBox(height: 4),
-          _buildInfoRow(
-            'ເງິນທອນ:',
-            '${currencyFormat.format(response.changeAmount)} ກີບ',
-          ),
+
+          // 🟢 Payment method section (moved after amount received)
+          if (response.paymentDetails.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            const Text(
+              'ຊຳລະຜ່ານ:',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 4),
+            ...response.paymentDetails.map((payment) {
+              String methodName = payment['method'] ?? '';
+              int amount = payment['amount'] ?? 0;
+
+              // Convert to readable name
+              String displayName = methodName;
+              if (methodName == 'CASH') {
+                displayName = 'ເງິນສົດ';
+              } else if (methodName == 'BANKTF') {
+                displayName = 'ເງິນໂອນ';
+              }
+
+              return Padding(
+                padding: const EdgeInsets.only(left: 16, bottom: 2),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '  • $displayName:',
+                      style: const TextStyle(fontSize: 15, color: Colors.green),
+                    ),
+                    Text(
+                      '${currencyFormat.format(amount)} ກີບ',
+                      style: const TextStyle(
+                        fontSize: 15,
+                        color: Colors.green,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ],
+
+          // 🟢 Show change only when paying with cash only
+          if (isCashOnly) ...[
+            const SizedBox(height: 4),
+            _buildInfoRow(
+              'ເງິນທອນ:',
+              '${currencyFormat.format(response.changeAmount)} ກີບ',
+            ),
+          ],
         ],
       ),
     );
   }
 
   // ===========================================================================
-  // 🟢 Ticket Stub (เพิ่ม GlobalKey สำหรับ Capture)
+  // 🟢 Ticket Stub (Added GlobalKey for Capture)
   // ===========================================================================
   Widget _buildTicketStub(ApiTicketResponse response, int index) {
     final DateTime now = DateTime.now();
@@ -316,8 +377,8 @@ class _ReceiptPageState extends State<ReceiptPage> {
     }
 
     return RepaintBoundary(
-      // 🟢 1. ครอบด้วย RepaintBoundary
-      key: _ticketKeys[index], // 🟢 2. ผูก GlobalKey
+      // 🟢 1. Wrap with RepaintBoundary
+      key: _ticketKeys[index], // 🟢 2. Bind GlobalKey
       child: Container(
         width: 480, // match printable width for 60mm label (~480 dots @203dpi)
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
@@ -326,14 +387,14 @@ class _ReceiptPageState extends State<ReceiptPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // -------------------------------------------------------
-            // [LEFT COLUMN] : ວັນທີ, ເລກທີ, QR Code
+            // [LEFT COLUMN] : Date, Ticket Number, QR Code
             // -------------------------------------------------------
             Expanded(
               flex: 4,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 1. ວັນທີ & ເວລາ
+                  // 1. Date & Time
                   Text(
                     'ວັນທີ: $dateString',
                     style: const TextStyle(fontSize: 14, color: Colors.black87),
@@ -343,19 +404,20 @@ class _ReceiptPageState extends State<ReceiptPage> {
                     style: const TextStyle(fontSize: 14, color: Colors.black87),
                   ),
 
-                  const SizedBox(height: 12), // ໄລຍະຫ່າງ
-                  // 2. ເລກທີປີ້
+                  const SizedBox(height: 12), // Spacing
+                  // 2. Ticket Number
                   Text(
                     'ເລກທີ: ${response.purchaseId}',
                     style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w500,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
                     ),
                   ),
 
                   const SizedBox(height: 12),
 
-                  // 3. QR Code (ຈັດກາງใน Column ຊ້າຍ)
+                  // 3. QR Code (Centered in Left Column)
                   Center(
                     child: SizedBox(
                       height: 140,
@@ -370,7 +432,7 @@ class _ReceiptPageState extends State<ReceiptPage> {
                   const SizedBox(height: 8),
                   const Divider(color: Colors.black26),
 
-                  // 4. ປະເພດປີ້
+                  // 4. Ticket Type
                   Center(
                     child: Text(
                       '$ticketTypeString x $countString ຈຳນວນ',
@@ -385,15 +447,15 @@ class _ReceiptPageState extends State<ReceiptPage> {
               ),
             ),
 
-            const SizedBox(width: 16), // ຊ່ອງວ່າງລະຫວ່າງຊ້າຍ-ຂວາ
+            const SizedBox(width: 16), // Spacing between left-right columns
             // -------------------------------------------------------
-            // [RIGHT COLUMN] : Laodoove, ຫົວຂໍ້, ຕາຕະລາງ
+            // [RIGHT COLUMN] : Laodoove, Header, Table
             // -------------------------------------------------------
             Expanded(
               flex: 6,
               child: Column(
                 children: [
-                  // 1. ຊື່ຮ້ານ Laodoove (ຊິດຂວາ)
+                  // 1. Shop Name Laodoove (Right Aligned)
                   const Align(
                     alignment: Alignment.centerRight,
                     child: Text(
@@ -406,16 +468,16 @@ class _ReceiptPageState extends State<ReceiptPage> {
                     ),
                   ),
 
-                  // 🔥 ໄລຍະຫ່າງນ້ອຍໆ ເພື່ອໃຫ້ຕາຕະລາງດຶງຂຶ້ນມາຕິດກັບຊື່ຮ້ານເລີຍ
+                  // 🔥 Small spacing to pull table closer to shop name
                   const SizedBox(height: 20),
 
-                  // 2. ຫົວຂໍ້ປະເພດເຄື່ອງຫຼິ້ນ
+                  // 2. Ride Type Header
                   const Text(
                     'ປະເພດເຄື່ອງຫຼິ້ນ',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 12),
-                  // 3. ຕາຕະລາງ
+                  // 3. Table
                   _buildRideTable(response.rideNames),
                 ],
               ),
@@ -427,7 +489,7 @@ class _ReceiptPageState extends State<ReceiptPage> {
   }
 
   // ---------------------------------------------------------------------------
-  // 🟢 Helper Widgets ສຳລັບຕາຕະລາງເຄື່ອງຫຼິ້ນ
+  // 🟢 Helper Widgets for Ride Table
   // ---------------------------------------------------------------------------
   Widget _buildRideTable(List<String> rideNames) {
     if (rideNames.isEmpty) {
@@ -439,37 +501,37 @@ class _ReceiptPageState extends State<ReceiptPage> {
       );
     }
 
-    // 1. ຄຳນວນການແບ່ງເຄິ່ງ (Dynamic Split)
+    // 1. Calculate half split (Dynamic Split)
     final int halfIndex = (rideNames.length / 2).ceil();
 
     final List<String> col1 = rideNames.sublist(0, halfIndex);
     final List<String> col2 = rideNames.sublist(halfIndex);
 
-    // 2. ຕື່ມຊ່ອງວ່າງໃສ່ຖັນທີ 2 ໃຫ້ຈຳນວນແຖວເທົ່າກັນ (ເພື່ອຄວາມສວຍງາມ)
+    // 2. Fill empty spaces in column 2 to match row count (for aesthetics)
     while (col2.length < col1.length) {
       col2.add('');
     }
 
     return Container(
       decoration: BoxDecoration(
-        // ขอบตารางสีดำ
+        // Black table border
         border: Border.all(color: Colors.black, width: 1.0),
       ),
       child: IntrinsicHeight(
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // --- ຖັນທີ 1 (ซ้าย) ---
+            // --- Column 1 (Left) ---
             Expanded(child: _buildRideColumn(col1)),
 
-            // --- ເສັ້ນຂັ້ນກາງ ---
+            // --- Center Divider ---
             const VerticalDivider(
               color: Colors.black,
               thickness: 1.0,
               width: 1,
             ),
 
-            // --- ຖັນທີ 2 (ขวา) ---
+            // --- Column 2 (Right) ---
             Expanded(child: _buildRideColumn(col2)),
           ],
         ),
@@ -481,7 +543,7 @@ class _ReceiptPageState extends State<ReceiptPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: items.map((item) {
-        // ถ้าเป็นช่องว่าง (ที่ add เข้าไปให้เต็ม)
+        // If it's an empty space (added to fill)
         if (item.isEmpty) return const SizedBox(height: 22);
 
         return Container(
@@ -490,13 +552,12 @@ class _ReceiptPageState extends State<ReceiptPage> {
               // (Optional)
               ),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start, // จัดชิดบน
+            crossAxisAlignment: CrossAxisAlignment.start, // Align to top
             children: [
-              // ວົງມົນ (Bullet)
               Padding(
                 padding: const EdgeInsets.only(
                   top: 3,
-                ), // ขยับวงกลมลงนิดหน่อย
+                ), // Move circle down slightly
                 child: Container(
                   width: 10,
                   height: 10,
@@ -507,8 +568,6 @@ class _ReceiptPageState extends State<ReceiptPage> {
                 ),
               ),
               const SizedBox(width: 6),
-
-              // ชื่องเครื่องเล่น
               Expanded(
                 child: Text(
                   item,
@@ -519,8 +578,8 @@ class _ReceiptPageState extends State<ReceiptPage> {
                     letterSpacing: 0.3,
                   ),
                   softWrap: true,
-                  maxLines: 2, // แสดงสูงสุด 2 บรรทัด
-                  overflow: TextOverflow.ellipsis, // ถ้ายาวเกินให้แสดง ...
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
@@ -582,11 +641,24 @@ class _ReceiptPageState extends State<ReceiptPage> {
                       'ຜູ້ຂາຍ: $_sellerName',
                       style: const TextStyle(fontSize: 16),
                     ),
+                    // 🟢 Add payment method
+                    if (response.paymentMethods.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        'ຊ່ອງທາງຊຳລະເງິນ: ${response.paymentMethods.map((method) {
+                          if (method == 'CASH') return 'ເງິນສົດ';
+                          if (method == 'BANKTF') return 'ເງິນໂອນ';
+                          return method;
+                        }).join(", ")}',
+                        style:
+                            const TextStyle(fontSize: 12, color: Colors.black),
+                      ),
+                    ],
                   ],
                 ),
               )
             else
-              // Header แบบเดิม (สำหรับ Financial Receipt ຫາກຕ້ອງການ)
+              // Original header (for Financial Receipt if needed)
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.only(bottom: 8.0),
@@ -639,7 +711,7 @@ class _ReceiptPageState extends State<ReceiptPage> {
           style: TextStyle(
             fontSize: 16,
             fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-            color: isBold ? Colors.red[700] : Colors.black,
+            color: Colors.black, // Changed to black for all
           ),
         ),
       ],
@@ -650,7 +722,7 @@ class _ReceiptPageState extends State<ReceiptPage> {
     if (qrData.isEmpty) {
       return const Text('ບໍ່ສາມາດສ້າງ QR Code ໄດ້');
     }
-    // ถ้า API ส่งมาเป็น SVG Base64 ก็แสดงผล
+    // If API sends SVG Base64, display it
     if (qrData.startsWith('data:image/svg+xml;base64,')) {
       try {
         String base64String = qrData.split(',').last;

@@ -4,14 +4,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-// --- Import หน้าจอต่างๆ ---
+// --- Import screens ---
 import '../screen/about_page.dart';
 import '../screen/config_page.dart';
 import '../config/sticker_printer_config_page.dart';
 
-// --- Import Service และ Model ---
+// --- Import Service and Model ---
 import '../services/profile_api.dart';
-import '../services/sticker_printer_service.dart'; // <<< 1. IMPORT SERVICE ใหม่
+import '../services/sticker_printer_service.dart'; // <<< 1. IMPORT NEW SERVICE
 
 class HomePageHeader extends StatefulWidget {
   const HomePageHeader({super.key});
@@ -21,24 +21,24 @@ class HomePageHeader extends StatefulWidget {
 }
 
 class _HomePageHeaderState extends State<HomePageHeader> {
-  // --- ตัวแปรเดิมสำหรับ Logic การกด ---
+  // --- Original variables for tap logic ---
   int _tapCount = 0;
   DateTime? _lastTapTime;
   Timer? _tapTimer;
 
-  // --- ตัวแปรข้อมูล User และ Storage ---
+  // --- User and Storage data variables ---
   String _userName = 'Loading...';
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
-  // --- ตัวแปรสำหรับ API Profile สวนสนุก ---
+  // --- Variables for amusement park Profile API ---
   final ProfileApiService _profileService = ProfileApiService();
   String _parkName = 'ລະບົບຂາຍປີ້ສວນສະໜຸກ';
   String? _logoUrl;
 
-  // 2. ✅ [เพิ่ม] Instance ของ Service
+  // 2. ✅ [Added] Instance of Service
   final StickerPrinterService _printerService = StickerPrinterService.instance;
 
-  // ❌ [ลบ] ตัวแปรสถานะปริ้นเตอร์ _isPrinterConnected ออกไป
+  // ❌ [Removed] Printer status variable _isPrinterConnected
 
   @override
   void initState() {
@@ -46,19 +46,19 @@ class _HomePageHeaderState extends State<HomePageHeader> {
     _debugCheckStorage();
     _loadUserName();
     _fetchProfile();
-    // ❌ [ลบ] _checkPrinterStatus(); ออกไป (เพราะเราจะฟังจาก Notifier แทน)
+    // ❌ [Removed] _checkPrinterStatus(); (because we listen from Notifier instead)
   }
 
   @override
   void dispose() {
     _tapTimer?.cancel();
-    // ไม่ต้อง dispose Notifier เพราะ Service เป็น Singleton
+    // No need to dispose Notifier because Service is Singleton
     super.dispose();
   }
 
-  // ❌ [ลบ] ฟังก์ชัน _checkPrinterStatus() ออกไป
+  // ❌ [Removed] _checkPrinterStatus() function
 
-  // --- ฟังก์ชันดึงข้อมูล Profile สวนสนุก (เหมือนเดิม) ---
+  // --- Function to fetch amusement park Profile (same as original) ---
   Future<void> _fetchProfile() async {
     final profile = await _profileService.getProfile();
     if (!mounted) return;
@@ -68,7 +68,7 @@ class _HomePageHeaderState extends State<HomePageHeader> {
     });
   }
 
-  // --- ฟังก์ชันดึงชื่อ User จาก Storage (เหมือนเดิม) ---
+  // --- Function to get User name from Storage (same as original) ---
   Future<void> _loadUserName() async {
     final userName = await _storage.read(key: 'user_name');
     if (mounted) {
@@ -85,7 +85,7 @@ class _HomePageHeaderState extends State<HomePageHeader> {
     }
   }
 
-  // --- Logic การกดไอคอน Info (Secret Menu) เหมือนเดิม ---
+  // --- Logic for Info icon tap (Secret Menu) same as original ---
   void _handleInfoIconTap() {
     final now = DateTime.now();
 
@@ -99,7 +99,7 @@ class _HomePageHeaderState extends State<HomePageHeader> {
     _tapTimer?.cancel();
 
     if (_tapCount == 7) {
-      // กด 7 ครั้ง: เข้าหน้า Config ทันที
+      // Tap 7 times: go to Config page immediately
       _tapCount = 0;
       _lastTapTime = null;
       if (mounted) {
@@ -109,7 +109,7 @@ class _HomePageHeaderState extends State<HomePageHeader> {
         );
       }
     } else if (_tapCount == 1) {
-      // กด 1 ครั้ง: เข้าหน้า About (รอ 2 วิ)
+      // Tap 1 time: go to About page (wait 2 seconds)
       _tapTimer = Timer(const Duration(seconds: 2), () {
         if (mounted) {
           _tapCount = 0;
@@ -131,7 +131,7 @@ class _HomePageHeaderState extends State<HomePageHeader> {
       padding: const EdgeInsets.symmetric(horizontal: 20.0),
       child: Row(
         children: [
-          // --- ส่วนแสดง Logo ... (โค้ดเดิม) ---
+          // --- Logo display section ... (original code) ---
           CircleAvatar(
             radius: 25.0,
             backgroundColor: Colors.purple[700],
@@ -155,7 +155,7 @@ class _HomePageHeaderState extends State<HomePageHeader> {
 
           const SizedBox(width: 15.0),
 
-          // --- ส่วนแสดงชื่อสวนสนุก ... (โค้ดเดิม) ---
+          // --- Park name display section ... (original code) ---
           Expanded(
             child: Text(
               _parkName,
@@ -168,7 +168,7 @@ class _HomePageHeaderState extends State<HomePageHeader> {
             ),
           ),
 
-          // --- [สำคัญ] ปุ่ม Printer พร้อมสถานะสี (ใช้ ValueListenableBuilder) ---
+          // --- [Important] Printer button with status color (using ValueListenableBuilder) ---
           ValueListenableBuilder<bool>(
             // 3. ✅ [แก้] ฟัง ValueNotifier จาก Service
             valueListenable: _printerService.isConnectedNotifier,
@@ -179,39 +179,40 @@ class _HomePageHeaderState extends State<HomePageHeader> {
               return Container(
                 margin: const EdgeInsets.only(right: 15.0),
                 decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2), // พื้นหลังปุ่มจางๆ
+                    color: Colors.white
+                        .withOpacity(0.2), // Transparent button background
                     shape: BoxShape.circle,
                     border: Border.all(
-                      // ขอบสีตามสถานะที่ได้รับจาก Service
+                      // Border color based on status from Service
                       color: statusColor,
                       width: 2.0,
                     )),
                 child: IconButton(
                   icon: Icon(
                     Icons.print,
-                    // ไอคอนสีตามสถานะที่ได้รับจาก Service
+                    // Icon color based on status from Service
                     color: statusColor,
                     size: 26.0,
                   ),
-                  tooltip: 'ຕັ້ງຄ່າປຣິນເຕີ',
+                  tooltip: 'ตັ້ງຄ່າປຣິນເຕີ',
                   onPressed: () {
-                    // กดแล้วไปหน้า Config Printer ทันที
+                    // Pressed then go to Config Printer page immediately
                     Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (context) => const StickerPrinterConfigPage(),
                       ),
                     );
-                    // ❌ ไม่ต้อง .then((_) { _checkPrinterStatus(); }) แล้ว
-                    // เพราะ ValueListenableBuilder จะอัปเดตเองอัตโนมัติ
+                    // ❌ No need .then((_) { _checkPrinterStatus(); }) anymore
+                    // because ValueListenableBuilder will update automatically
                   },
                 ),
               );
             },
           ),
-          // --- จบ ValueListenableBuilder ---
+          // --- End ValueListenableBuilder ---
 
-          // --- ส่วนแสดงชื่อ User (เหมือนเดิม) ---
+          // --- User name display section (same as original) ---
           Row(
             children: [
               const Icon(Icons.person, color: Colors.white, size: 24.0),
@@ -228,7 +229,7 @@ class _HomePageHeaderState extends State<HomePageHeader> {
             ],
           ),
 
-          // --- ปุ่ม Info (Secret Menu) เหมือนเดิม ---
+          // --- Info button (Secret Menu) same as original ---
           IconButton(
             icon: const Icon(
               Icons.info_outline,
