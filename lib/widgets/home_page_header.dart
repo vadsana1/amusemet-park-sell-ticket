@@ -7,11 +7,13 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 // --- Import screens ---
 import '../screen/about_page.dart';
 import '../screen/config_page.dart';
+import '../config/setting_config.dart';
 import '../config/sticker_printer_config_page.dart';
 
 // --- Import Service and Model ---
 import '../services/profile_api.dart';
 import '../services/sticker_printer_service.dart'; // <<< 1. IMPORT NEW SERVICE
+import '../services/login_api.dart'; // 🔑 สำหรับเช็ค Admin
 
 class HomePageHeader extends StatefulWidget {
   const HomePageHeader({super.key});
@@ -37,8 +39,12 @@ class _HomePageHeaderState extends State<HomePageHeader> {
 
   // 2. ✅ [Added] Instance of Service
   final StickerPrinterService _printerService = StickerPrinterService.instance;
+  final LoginApi _loginService = LoginApi(); // 🔑 สำหรับเช็ค Admin
 
   // ❌ [Removed] Printer status variable _isPrinterConnected
+
+  // 🔑 ตัวแปรเช็คว่าเป็น admin หรือไม่
+  bool _isAdmin = false;
 
   @override
   void initState() {
@@ -46,6 +52,7 @@ class _HomePageHeaderState extends State<HomePageHeader> {
     _debugCheckStorage();
     _loadUserName();
     _fetchProfile();
+    _checkAdminStatus(); // 🔑 เช็คว่าเป็น admin หรือไม่
     // ❌ [Removed] _checkPrinterStatus(); (because we listen from Notifier instead)
   }
 
@@ -74,6 +81,16 @@ class _HomePageHeaderState extends State<HomePageHeader> {
     if (mounted) {
       setState(() {
         _userName = userName ?? 'User';
+      });
+    }
+  }
+
+  // 🔑 เช็คว่าผู้ใช้เป็น admin/dev หรือไม่
+  Future<void> _checkAdminStatus() async {
+    final isAdmin = await _loginService.isAdmin();
+    if (mounted) {
+      setState(() {
+        _isAdmin = isAdmin;
       });
     }
   }
@@ -211,6 +228,32 @@ class _HomePageHeaderState extends State<HomePageHeader> {
             },
           ),
           // --- End ValueListenableBuilder ---
+
+          // --- Settings button (Print Settings) - 🔑 แสดงเฉพาะ Admin เท่านั้น ---
+          if (_isAdmin)
+            Container(
+              margin: const EdgeInsets.only(right: 15.0),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                shape: BoxShape.circle,
+              ),
+              child: IconButton(
+                icon: const Icon(
+                  Icons.settings,
+                  color: Colors.white,
+                  size: 26.0,
+                ),
+                tooltip: 'ການຕັ້ງຄ່າ (Admin only)',
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const SettingConfig(),
+                    ),
+                  );
+                },
+              ),
+            ),
 
           // --- User name display section (same as original) ---
           Row(

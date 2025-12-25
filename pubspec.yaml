@@ -1,7 +1,7 @@
 name: ticket_app
 description: "A new Flutter project."
 publish_to: "none"
-version: 1.1.0+7.9
+version: 1.1.0+8.2
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
@@ -31,6 +31,8 @@ dependencies:
   image: ^4.0.17
   # --- Printer Hardware ---
   imin_printer: ^0.6.14
+  image_picker: ^1.1.2  # ເພີ່ມຕົວນີ້
+  path_provider: ^2.1.5
   
   # 👇 พระเอกคนใหม่ (เบา และไม่ตีกับใคร)
   flutter_usb_printer: ^0.1.0+1

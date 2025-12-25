@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- TSC Printer (VID: 4611 / 0x1203, PID: 720 / 0x02D0) -->
+    <usb-device vendor-id="4611" product-id="720" />
+    
+    <!-- iMin Printer (VID: 1305 / 0x0519, PID: 8211 / 0x2013) -->
+    <usb-device vendor-id="1305" product-id="8211" />
+    
+    <!-- เพิ่ม printer อื่นๆ ตามต้องการ -->
+</resources>

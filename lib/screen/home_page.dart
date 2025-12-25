@@ -30,6 +30,9 @@ class _HomePageState extends State<HomePage> {
   final PaymentApi _paymentApi = PaymentApi();
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
+  // 🆕 Reference to printer service
+  final StickerPrinterService _printerService = StickerPrinterService.instance;
+
   // Key for clearing values in SingleTicketPage (right side)
   final GlobalKey<State<SingleTicketPage>> _ticketPageStateKey = GlobalKey();
 
@@ -50,6 +53,101 @@ class _HomePageState extends State<HomePage> {
     _loadUserId();
     // Auto-connect to TSC printer when user reaches home page
     StickerPrinterService.instance.autoConnectOnStartup();
+
+    // 🆕 ฟังการแจ้งเตือนการเชื่อมต่อใหม่
+    _listenToReconnectNotifier();
+  }
+
+  @override
+  void dispose() {
+    // ไม่ต้อง dispose notifier เพราะเป็น singleton
+    super.dispose();
+  }
+
+  // 🆕 ฟังการแจ้งเตือนการเชื่อมต่อใหม่
+  void _listenToReconnectNotifier() {
+    _printerService.needsReconnectNotifier.addListener(() {
+      if (_printerService.needsReconnectNotifier.value && mounted) {
+        _showReconnectDialog();
+      }
+    });
+  }
+
+  // 🆕 แสดง dialog เมื่อตรวจพบการเสียบ USB ใหม่
+  void _showReconnectDialog() {
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        title: Row(
+          children: const [
+            Icon(Icons.usb, color: Color(0xFF15A19A), size: 30),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'ຕ້ອງການເຊື່ອມຕໍ່ເຄື່ອງພິມ?',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: const Text(
+          'ກວດພົບເຄື່ອງພິມຖືກເສັຽບເຂົ້າແລ້ວ\nຕ້ອງການເຊື່ອມຕໍ່ດຽວນີ້ບໍ?',
+          style: TextStyle(fontSize: 16),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              _printerService.clearReconnectFlag();
+              Navigator.pop(context);
+            },
+            child: const Text(
+              'ຍົກເລີກ',
+              style: TextStyle(color: Colors.grey),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF15A19A),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            onPressed: () async {
+              Navigator.pop(context);
+              _printerService.clearReconnectFlag();
+
+              // พยายามเชื่อมต่อใหม่
+              await _printerService.autoConnectOnStartup();
+
+              if (!mounted) return;
+              final isConnected = _printerService.isConnectedNotifier.value;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    isConnected ? '✅ ເຊື່ອມຕໍ່ສຳເລັດ' : '❌ ເຊື່ອມຕໍ່ບໍ່ສຳເລັດ',
+                  ),
+                  backgroundColor: isConnected ? Colors.green : Colors.red,
+                ),
+              );
+            },
+            child: const Text(
+              'ເຊື່ອມຕໍ່',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   // Load User ID from Storage

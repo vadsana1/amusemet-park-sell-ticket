@@ -1,0 +1,571 @@
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
+class SettingConfig extends StatefulWidget {
+  const SettingConfig({super.key});
+
+  @override
+  State<SettingConfig> createState() => _SettingConfigState();
+}
+
+class _SettingConfigState extends State<SettingConfig>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const Color mainColor = Color(0xFF15A19A);
+
+    return Scaffold(
+      backgroundColor: mainColor,
+      appBar: AppBar(
+        backgroundColor: mainColor,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: Text(
+          'ການຕັ້ງຄ່າ',
+          style: GoogleFonts.notoSansLao(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        centerTitle: true,
+        bottom: TabBar(
+          controller: _tabController,
+          indicatorColor: Colors.white,
+          indicatorWeight: 3,
+          labelStyle: GoogleFonts.notoSansLao(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+          unselectedLabelStyle: GoogleFonts.notoSansLao(
+            fontSize: 16,
+            fontWeight: FontWeight.normal,
+          ),
+          tabs: const [
+            Tab(
+              icon: Icon(Icons.print, color: Colors.white),
+              text: 'ການພິມ',
+            ),
+            Tab(
+              icon: Icon(Icons.settings_input_antenna, color: Colors.white),
+              text: 'ເຄື່ອງພິມ',
+            ),
+          ],
+        ),
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: const [
+          PrintSettingsTab(),
+          PrinterConnectionTab(),
+        ],
+      ),
+    );
+  }
+}
+
+// ===================================================================
+// Tab 1: Print Settings (Auto Print, Display Time)
+// ===================================================================
+class PrintSettingsTab extends StatefulWidget {
+  const PrintSettingsTab({super.key});
+
+  @override
+  State<PrintSettingsTab> createState() => _PrintSettingsTabState();
+}
+
+class _PrintSettingsTabState extends State<PrintSettingsTab> {
+  final _storage = const FlutterSecureStorage();
+  bool _isLoading = false;
+  bool _autoPrintEnabled = true; // default: auto print
+  int _displaySeconds = 4; // default: show for 4 seconds
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    setState(() => _isLoading = true);
+    try {
+      final autoPrint = await _storage.read(key: 'auto_print_enabled');
+      final displayTime = await _storage.read(key: 'receipt_display_seconds');
+
+      setState(() {
+        _autoPrintEnabled = autoPrint != 'false'; // default true if not set
+        _displaySeconds = int.tryParse(displayTime ?? '4') ?? 4;
+      });
+    } catch (e) {
+      _showMessage('ເກີດຂໍ້ຜິດພາດໃນການໂຫຼດຂໍ້ມູນ: $e', isError: true);
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _saveSettings() async {
+    setState(() => _isLoading = true);
+    try {
+      await _storage.write(
+        key: 'auto_print_enabled',
+        value: _autoPrintEnabled.toString(),
+      );
+      await _storage.write(
+        key: 'receipt_display_seconds',
+        value: _displaySeconds.toString(),
+      );
+
+      _showMessage('ບັນທຶກການຕັ້ງຄ່າສຳເລັດ!', isError: false);
+    } catch (e) {
+      _showMessage('ເກີດຂໍ້ຜິດພາດ: $e', isError: true);
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  void _showMessage(String message, {required bool isError}) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message, style: GoogleFonts.notoSansLao()),
+          backgroundColor: isError ? Colors.red : Colors.green,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const Color mainColor = Color(0xFF15A19A);
+    const Color buttonColor = Color(0xFFE8DBB0);
+
+    return SafeArea(
+      child: _isLoading
+          ? const Center(
+              child: CircularProgressIndicator(color: Colors.white),
+            )
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Info Banner
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withAlpha(25),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.print,
+                          color: Colors.white,
+                          size: 28,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'ຕັ້ງຄ່າການພິມໃບຮັບເງິນອັດຕະໂນມັດ',
+                            style: GoogleFonts.notoSansLao(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 30),
+
+                  // Auto Print Toggle Card
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(15),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withAlpha(25),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              _autoPrintEnabled ? Icons.print : Icons.touch_app,
+                              color: mainColor,
+                              size: 28,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'ພິມອັດຕະໂນມັດ',
+                                    style: GoogleFonts.notoSansLao(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    _autoPrintEnabled
+                                        ? 'ເປີດໃຊ້ງານ - ພິມທັນທີເມື່ອເຂົ້າໜ້າໃບຮັບເງິນ'
+                                        : 'ປິດໃຊ້ງານ - ຕ້ອງກົດປຸ່ມພິມດ້ວຍຕົນເອງ',
+                                    style: GoogleFonts.notoSansLao(
+                                      fontSize: 13,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Switch(
+                              value: _autoPrintEnabled,
+                              onChanged: (value) {
+                                setState(() {
+                                  _autoPrintEnabled = value;
+                                });
+                              },
+                              activeColor: mainColor,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Display Time Card
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(15),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withAlpha(25),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.timer,
+                              color: mainColor,
+                              size: 28,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'ເວລາສະແດງໜ້າໃບຮັບເງິນ',
+                                    style: GoogleFonts.notoSansLao(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'ໜ້າໃບຮັບເງິນຈະປິດອັດຕະໂນມັດຫຼັງຈາກ $_displaySeconds ວິນາທີ',
+                                    style: GoogleFonts.notoSansLao(
+                                      fontSize: 13,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Slider(
+                                value: _displaySeconds.toDouble(),
+                                min: 2,
+                                max: 15,
+                                divisions: 13,
+                                activeColor: mainColor,
+                                label: '$_displaySeconds ວິນາທີ',
+                                onChanged: (value) {
+                                  setState(() {
+                                    _displaySeconds = value.toInt();
+                                  });
+                                },
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: mainColor.withAlpha(25),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                '$_displaySeconds ວິ',
+                                style: GoogleFonts.notoSansLao(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: mainColor,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 30),
+
+                  // Info Box
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.blue.shade200),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.info_outline,
+                              color: Colors.blue.shade700,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'ຄຳອະທິບາຍ',
+                              style: GoogleFonts.notoSansLao(
+                                color: Colors.blue.shade900,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          '• ເມື່ອເປີດ "ພິມອັດຕະໂນມັດ" ລະບົບຈະພິມໃບຮັບເງິນທັນທີເມື່ອເຂົ້າໜ້າ\n'
+                          '• ເມື່ອປິດ "ພິມອັດຕະໂນມັດ" ຕ້ອງກົດປຸ່ມພິມດ້ວຍຕົນເອງ\n'
+                          '• ໜ້າໃບຮັບເງິນຈະປິດອັດຕະໂນມັດຕາມເວລາທີ່ກຳນົດ\n'
+                          '• ສາມາດກົດປຸ່ມກັບເພື່ອກັບໄປໜ້າຈ່າຍເງິນໄດ້',
+                          style: GoogleFonts.notoSansLao(
+                            color: Colors.blue.shade900,
+                            fontSize: 14,
+                            height: 1.6,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 30),
+
+                  // Save Button
+                  ElevatedButton(
+                    onPressed: _saveSettings,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: buttonColor,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      elevation: 3,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.save, color: Colors.black87),
+                        const SizedBox(width: 8),
+                        Text(
+                          'ບັນທຶກການຕັ້ງຄ່າ',
+                          style: GoogleFonts.notoSansLao(
+                            color: Colors.black87,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Reset to Default Button
+                  OutlinedButton(
+                    onPressed: () {
+                      setState(() {
+                        _autoPrintEnabled = true;
+                        _displaySeconds = 4;
+                      });
+                      _showMessage(
+                        'ຣີເຊັດເປັນຄ່າເລີ່ມຕົ້ນແລ້ວ ກະລຸນາກົດບັນທຶກ',
+                        isError: false,
+                      );
+                    },
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      side: const BorderSide(color: Colors.white, width: 2),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.restore,
+                          color: Colors.white,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'ຣີເຊັດເປັນຄ່າເລີ່ມຕົ້ນ',
+                          style: GoogleFonts.notoSansLao(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+    );
+  }
+}
+
+// ===================================================================
+// Tab 2: Printer Connection (Placeholder for future integration)
+// ===================================================================
+class PrinterConnectionTab extends StatelessWidget {
+  const PrinterConnectionTab({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Coming Soon Card
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(15),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withAlpha(25),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.settings_input_antenna,
+                    size: 80,
+                    color: Colors.grey[400],
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    'ການຕັ້ງຄ່າເຄື່ອງພິມ',
+                    style: GoogleFonts.notoSansLao(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'ສ່ວນນີ້ຈະມີການເຊື່ອມຕໍ່ກັບເຄື່ອງພິມ\nການ Scan ແລະ Test Print\nໃນເວີຊັ້ນຕໍ່ໄປ',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.notoSansLao(
+                      fontSize: 16,
+                      color: Colors.grey[600],
+                      height: 1.6,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.blue.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          color: Colors.blue.shade700,
+                          size: 24,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'ຈະລວມເອົາຟັງຊັ່ນຈາກໜ້າ\nsticker_printer_config_page\nເຂົ້າມາໃນທີ່ນີ້',
+                            style: GoogleFonts.notoSansLao(
+                              fontSize: 14,
+                              color: Colors.blue.shade900,
+                              height: 1.5,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

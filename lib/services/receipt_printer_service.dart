@@ -46,49 +46,42 @@ class ReceiptPrinterService {
     required String childrenPlayed,
   }) async {
     try {
-      // 1. Title (centered)
+      // 1. Report Title
       await iminPrinter.printText(
         'ລາຍງານສະຫຼຸບຮອບ',
         style: IminTextStyle(
-          fontSize: 28,
+          fontSize: 32,
           align: IminPrintAlign.center,
           fontStyle: IminFontStyle.bold,
         ),
       );
       await iminPrinter.printText('--------------------------------');
 
-      // 2. Seller and shift info (left aligned)
+      // 2. Seller and shift info (left aligned, bigger font)
       await iminPrinter.printText(
         'ຜູ້ຂາຍ: $cashierName',
-        style: IminTextStyle(fontSize: 12, align: IminPrintAlign.left),
+        style: IminTextStyle(fontSize: 20, align: IminPrintAlign.left),
       );
       await iminPrinter.printText(
         'ເລກທີຮອບ: $shiftId',
-        style: IminTextStyle(fontSize: 12, align: IminPrintAlign.left),
+        style: IminTextStyle(fontSize: 20, align: IminPrintAlign.left),
       );
       await iminPrinter.printText('--------------------------------');
 
-      // 3. Time period info
-      await iminPrinter.printText(
-        '--- ໄລຍະເວລາ ---',
-        style: IminTextStyle(fontSize: 14, align: IminPrintAlign.center),
-      );
+      // 3. Time period info (bigger font)
       await iminPrinter.printText(
         'ເລີ່ມ: $startDate',
-        style: IminTextStyle(fontSize: 14, align: IminPrintAlign.left),
+        style: IminTextStyle(fontSize: 20, align: IminPrintAlign.left),
       );
       await iminPrinter.printText(
         'ສິ້ນສຸດ: $endDate',
-        style: IminTextStyle(fontSize: 14, align: IminPrintAlign.left),
+        style: IminTextStyle(fontSize: 20, align: IminPrintAlign.left),
       );
       await iminPrinter.printText('--------------------------------');
 
       // 4. Sales summary (use _printRow for left-right alignment)
 
-      await iminPrinter.printText(
-        '--- ຍອດຂາຍ (Sales) ---',
-        style: IminTextStyle(fontSize: 14, align: IminPrintAlign.center),
-      );
+      // Sales summary (no section header)
       // Total sales
       await _printRow('ຍອດຂາຍທັງຫມົດ:', '$totalRevenue ກີບ', isBold: true);
       // Sales by category
@@ -96,37 +89,21 @@ class ReceiptPrinterService {
       await _printRow(' - ເດັກນ້ອຍ:', '$childSales ກີບ');
 
       await iminPrinter.printText('--------------------------------');
-
-      // 5. Visitor count summary
-      await iminPrinter.printText(
-        '--- ຈຳນວນປີ້ (Tickets) ---',
-        style: IminTextStyle(fontSize: 14, align: IminPrintAlign.center),
-      );
-      await _printRow('ລວມຈົານວນປີ້ຂາຍ:', '$totalTickets ໃບ', isBold: true);
-      await _printRow(' - ຜູ້ໃຫຍ່:', '$adultVisitors ຄົນ');
-      await _printRow(' - ເດັກນ້ອຍ:', '$childVisitors ຄົນ');
-      await _printRow('ລວມຄົນເຂົ້າຊົມ:',
-          '$totalVisitors ຄົນ'); // Duplicate from above but adds clarity
+      // 5. Visitor count summary (no section header)
+      await _printRow('ລວມຈໍານວນປີ້ຂາຍ:', '$totalTickets ໃບ', isBold: true);
+      await _printRow(' - ຜູ້ໃຫຍ່:', '$adultVisitors ໃບ');
+      await _printRow(
+          ' - ເດັກນ້ອຍ:', '$childVisitors ໃບ'); // เปลี่ยนเป็นจำนวนปี้ทั้งหมด
 
       await iminPrinter.printText('--------------------------------');
-
-      // 6. Payment methods
-      await iminPrinter.printText(
-        '--- ການຊົາລະ ---',
-        style: IminTextStyle(fontSize: 12, align: IminPrintAlign.center),
-      );
+      // 6. Payment methods (no section header)
       for (var p in payments) {
         // p['method'] is full name, p['total'] is amount
         await _printRow('${p['method']}:', '${p['total']} ກີບ', isBold: true);
       }
 
       await iminPrinter.printText('--------------------------------');
-
-      // 7. Rides summary
-      await iminPrinter.printText(
-        '--- ການຫຼິ້ນ (Rides) ---',
-        style: IminTextStyle(fontSize: 12, align: IminPrintAlign.center),
-      );
+      // 7. Rides summary (no section header)
       await _printRow('ລວມການຫຼິ້ນ:', '$totalPlays ຄັ້ງ');
       await _printRow(' - ຜູ້ໃຫຍ່:', '$adultsPlayed ຄັ້ງ');
       await _printRow(' - ເດັກນ້ອຍ:', '$childrenPlayed ຄັ້ງ');

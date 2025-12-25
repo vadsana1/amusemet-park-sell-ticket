@@ -48,7 +48,7 @@ class _PaymentPageState extends State<PaymentPage> {
   @override
   void didUpdateWidget(covariant PaymentPage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    
+
     if (widget.paymentMethods != oldWidget.paymentMethods) {
       _setupPaymentOptions();
     }
@@ -57,8 +57,10 @@ class _PaymentPageState extends State<PaymentPage> {
   // [Added] Function to combine API buttons with Split button
   void _setupPaymentOptions() {
     setState(() {
-      // 1. Get list from API
-      _allPaymentOptions = List.from(widget.paymentMethods);
+      // 1. Get list from API and filter out BANKTF (โอน)
+      _allPaymentOptions = List<PaymentMethod>.from(widget.paymentMethods)
+          .where((m) => m.code != 'BANKTF')
+          .toList();
 
       // 2. Select Default
       if (_selectedPaymentCode == null && _allPaymentOptions.isNotEmpty) {
@@ -80,20 +82,28 @@ class _PaymentPageState extends State<PaymentPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('ສະຫຼຸບລາຍການ ແລະ ຊຳລະເງິນ'),
-        backgroundColor: const Color(0xFF1A9A8B),
-      ),
-      body: Row(
-        children: [
-          Expanded(flex: 6, child: _buildSummarySection()),
-          Container(
-            width: 450,
-            color: const Color(0xFFEAEAEA),
-            child: _buildPaymentSection(),
-          ),
-        ],
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (!didPop) {
+          Navigator.of(context).pop(false);
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('ສະຫຼຸບລາຍການ ແລະ ຊຳລະເງິນ'),
+          backgroundColor: const Color(0xFF1A9A8B),
+        ),
+        body: Row(
+          children: [
+            Expanded(flex: 6, child: _buildSummarySection()),
+            Container(
+              width: 450,
+              color: const Color(0xFFEAEAEA),
+              child: _buildPaymentSection(),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -199,7 +209,6 @@ class _PaymentPageState extends State<PaymentPage> {
     );
   }
 
-
   Widget _buildPaymentSection() {
     if (_selectedPaymentCode == null) {
       if (widget.paymentMethods.isEmpty) {
@@ -238,15 +247,11 @@ class _PaymentPageState extends State<PaymentPage> {
                     ?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
-
- 
               _buildPaymentTabs(),
-
               const SizedBox(height: 24),
             ],
           ),
           Expanded(
-   
             child: _buildSelectedPaymentView(),
           ),
         ],
@@ -254,7 +259,6 @@ class _PaymentPageState extends State<PaymentPage> {
     );
   }
 
-  
   Widget _buildSelectedPaymentView() {
     switch (_selectedPaymentCode) {
       case 'CASH':
@@ -285,7 +289,6 @@ class _PaymentPageState extends State<PaymentPage> {
     }
   }
 
- 
   Widget _buildPaymentTabs() {
     if (_allPaymentOptions.isEmpty) {
       return const SizedBox.shrink();
@@ -301,15 +304,13 @@ class _PaymentPageState extends State<PaymentPage> {
         child: Text(
           method.name,
           textAlign: TextAlign.center,
-          style: const TextStyle(
-              fontSize: 14), 
+          style: const TextStyle(fontSize: 14),
         ),
       );
     }).toList();
 
     return Center(
       child: SingleChildScrollView(
-       
         scrollDirection: Axis.horizontal,
         child: ToggleButtons(
           isSelected: isSelected,
@@ -322,7 +323,6 @@ class _PaymentPageState extends State<PaymentPage> {
           selectedBorderColor: const Color(0xFF1A9A8B),
           selectedColor: Colors.white,
           fillColor: const Color(0xFF1A9A8B),
-
           children: children,
         ),
       ),

@@ -42,6 +42,10 @@ class _ReceiptPageState extends State<ReceiptPage> {
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
   String _sellerName = 'Loading...';
 
+  // Track print status
+  bool _hasPrinted = false;
+  bool _autoPrintEnabled = true;
+
   // Formatters
   final currencyFormat = NumberFormat("#,##0", "en_US");
   final dateFormat = DateFormat('dd/MM/yyyy');
@@ -67,6 +71,113 @@ class _ReceiptPageState extends State<ReceiptPage> {
     } else {
       log("Skipped iMin Init (Emulator Mode)");
     }
+
+    // 🟢 Check settings and auto print if enabled
+    _checkAndAutoPrint();
+  }
+
+  // Check settings and auto print if enabled
+  Future<void> _checkAndAutoPrint() async {
+    // Load settings from storage
+    final autoPrintEnabledStr = await _storage.read(key: 'auto_print_enabled');
+    final displaySecondsStr =
+        await _storage.read(key: 'receipt_display_seconds');
+
+    // Parse settings (default: enabled, 4 seconds)
+    final bool autoPrintEnabled = autoPrintEnabledStr != 'false';
+    final int displaySeconds = int.tryParse(displaySecondsStr ?? '4') ?? 4;
+
+    // Save auto print status
+    setState(() {
+      _autoPrintEnabled = autoPrintEnabled;
+    });
+
+    log('Auto Print Enabled: $autoPrintEnabled, Display Seconds: $displaySeconds');
+
+    if (autoPrintEnabled) {
+      // Mark as printed since it's auto
+      setState(() {
+        _hasPrinted = true;
+      });
+      // Wait for widgets to be fully rendered
+      await Future.delayed(const Duration(milliseconds: 1000));
+
+      // Trigger print (but don't close immediately)
+      _handlePrintOnly();
+
+      // Wait configured seconds then close
+      await Future.delayed(Duration(seconds: displaySeconds));
+
+      if (mounted) {
+        // ส่ง true กลับไปให้หน้าจ่ายเงิน clear ข้อมูลและกลับหน้าหลัก
+        Navigator.of(context).pop(true);
+      }
+    }
+    // If auto print disabled, just show the page (user will click print button manually)
+  }
+
+  // Print without closing the page
+  Future<void> _handlePrintOnly() async {
+    log("Starting dual print job...");
+
+    // =========================================================================
+    // Part 1: iMin Printer (Print Financial Receipt)
+    // =========================================================================
+    if (_isIminEnabled) {
+      try {
+        log("Printing Financial Receipt to iMin...");
+        await _iminService.printFinancialReceipt(
+          widget.responses.first,
+          _sellerName,
+        );
+      } catch (e) {
+        log("Error Printing to iMin: $e");
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('iMin Error: $e')));
+        }
+      }
+    } else {
+      log("Skipped iMin Printing (Emulator Mode)");
+    }
+
+    // =========================================================================
+    // Part 2: Sticker Printer (Print Ticket Images)
+    // =========================================================================
+    try {
+      log("Starting capture and print job for ${widget.responses.length} tickets...");
+
+      for (int i = 0; i < widget.responses.length; i++) {
+        log("Capturing and printing ticket ${i + 1}/${widget.responses.length}...");
+
+        final Uint8List? imageBytes = await _captureWidgetToBytes(i);
+
+        if (imageBytes != null) {
+          await _ticketService.printImageFile(
+            imageBytes,
+            x: 0,
+            y: 0,
+            maxWidthDots: 480,
+          );
+
+          await Future.delayed(const Duration(milliseconds: 700));
+        } else {
+          log("Skipped printing ticket ${i + 1}: Failed to capture image.");
+        }
+      }
+
+      log("Sticker print job complete.");
+    } catch (e) {
+      log("Printing Tickets Error: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Ticket Print Error: $e')));
+      }
+    }
+
+    log("Print job complete.");
   }
 
   Future<void> _loadSellerName() async {
@@ -119,74 +230,24 @@ class _ReceiptPageState extends State<ReceiptPage> {
   // ---------------------------------------------------------------------------
 
   void _handlePrintAndClose() async {
-    log("Starting dual print job...");
+    // Mark as printed
+    setState(() {
+      _hasPrinted = true;
+    });
 
-    // =========================================================================
-    // Part 1: iMin Printer (Print Financial Receipt)
-    // =========================================================================
-    if (_isIminEnabled) {
-      try {
-        log("Printing Financial Receipt to iMin...");
-        await _iminService.printFinancialReceipt(
-          widget.responses.first,
-          _sellerName,
-        );
-      } catch (e) {
-        log("Error Printing to iMin: $e");
-        if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('iMin Error: $e')));
-        }
-      }
-    } else {
-      log("Skipped iMin Printing (Emulator Mode)");
-    }
+    // Use the new print-only function
+    await _handlePrintOnly();
 
-    // =========================================================================
-    // 🟢 [4] Part 2: Sticker Printer (Print Ticket Images)
-    // =========================================================================
-    try {
-      log("Starting capture and print job for ${widget.responses.length} tickets...");
-
-      for (int i = 0; i < widget.responses.length; i++) {
-        log("Capturing and printing ticket ${i + 1}/${widget.responses.length}...");
-
-        // 1. Capture Widget as Bytes
-        final Uint8List? imageBytes = await _captureWidgetToBytes(i);
-
-        if (imageBytes != null) {
-          // 2. Print the entire image (using Service function)
-          // Use 0, 0 to start printing from top-left corner of sticker
-          await _ticketService.printImageFile(
-            imageBytes,
-            x: 0,
-            y: 0,
-            maxWidthDots: 480,
-          );
-
-          // Delay to allow printer to process Bitmap before next ticket
-          await Future.delayed(const Duration(milliseconds: 700));
-        } else {
-          log("Skipped printing ticket ${i + 1}: Failed to capture image.");
-        }
-      }
-
-      log("Sticker print job complete.");
-    } catch (e) {
-      log("Printing Tickets Error: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Ticket Print Error: $e')));
-      }
-    }
-
-    log("Print job complete.");
-
-    // Close screen when work is complete
+    // ไม่กลับไปหน้าหลัก - อยู่ที่หน้า Receipt เพื่อให้สามารถกดปริ้นซ้ำได้
+    // ในกรณีที่ปริ้นไม่ออก ผู้ใช้สามารถกดปุ่ม Print อีกครั้งได้
     if (mounted) {
-      Navigator.of(context).pop(true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('✅ ສົ່ງຄຳສັ່ງພິມສຳເລັດ - ກົດກັບເພື່ອອອກ'),
+          duration: Duration(seconds: 2),
+          backgroundColor: Colors.green,
+        ),
+      );
     }
   }
 
@@ -205,30 +266,62 @@ class _ReceiptPageState extends State<ReceiptPage> {
 
     final ApiTicketResponse financialResponse = widget.responses.first;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('ໃບຮັບເງິນ (Receipt)'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(true),
+    return WillPopScope(
+      onWillPop: () async {
+        // If auto print is disabled and haven't printed yet, prevent back
+        if (!_autoPrintEnabled && !_hasPrinted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('ກະລຸນາກົດປຸ່ມພິມກ່ອນກັບຄືນ'),
+              duration: Duration(seconds: 2),
+              backgroundColor: Colors.orange,
+            ),
+          );
+          return false; // Prevent back
+        }
+        // ถ้าปริ้นแล้ว ให้ส่ง true กลับไปเพื่อ clear ข้อมูล
+        Navigator.of(context).pop(_hasPrinted);
+        return false; // จัดการ pop เอง
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('ໃບຮັບເງິນ (Receipt)'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () {
+              // Check same condition
+              if (!_autoPrintEnabled && !_hasPrinted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('ກະລຸນາກົດປຸ່ມພິມກ່ອນກັບຄືນ'),
+                    duration: Duration(seconds: 2),
+                    backgroundColor: Colors.orange,
+                  ),
+                );
+                return;
+              }
+              // ถ้าปริ้นแล้ว (_hasPrinted == true) ให้ส่ง true กลับไป
+              Navigator.of(context).pop(_hasPrinted);
+            },
+          ),
         ),
-      ),
-      backgroundColor: Colors.grey[300],
-      body: SingleChildScrollView(
-        child: Center(
-          child: Column(
-            children: [
-              const SizedBox(height: 24),
-              // UI: Financial Summary Receipt (unchanged)
-              _buildFinancialReceipt(financialResponse),
-              const SizedBox(height: 24),
-              // UI: All Tickets (modified layout inside)
-              _buildTicketStubsWrap(widget.responses),
-              const SizedBox(height: 24),
-              // UI: Print Button
-              _buildPrintButton(),
-              const SizedBox(height: 24),
-            ],
+        backgroundColor: Colors.grey[300],
+        body: SingleChildScrollView(
+          child: Center(
+            child: Column(
+              children: [
+                const SizedBox(height: 24),
+                // UI: Financial Summary Receipt (unchanged)
+                _buildFinancialReceipt(financialResponse),
+                const SizedBox(height: 24),
+                // UI: All Tickets (modified layout inside)
+                _buildTicketStubsWrap(widget.responses),
+                const SizedBox(height: 24),
+                // UI: Print Button
+                _buildPrintButton(),
+                const SizedBox(height: 24),
+              ],
+            ),
           ),
         ),
       ),

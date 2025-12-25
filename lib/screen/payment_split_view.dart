@@ -5,12 +5,14 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import 'dart:developer';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../models/cart_item.dart';
 import '../models/api_ticket_response.dart';
 import './receipt_page.dart';
 import '../services/newticket_api.dart';
 import '../services/newticket_multiple_api.dart';
+import '../utils/url_helper.dart' show storage;
 
 class PaymentSplitView extends StatefulWidget {
   final double totalPrice;
@@ -45,6 +47,7 @@ class _PaymentSplitViewState extends State<PaymentSplitView> {
   final VisitorApi _visitorApi = VisitorApi();
   // API สำหรับ multiple-split (หลายตั๋ว)
   final SellDayPassMultipleApi _visitorApiMultiple = SellDayPassMultipleApi();
+  // 🔧 ใช้ global storage จาก url_helper แทน
 
   static final platform =
       const MethodChannel('com.example.amusemet_park_sell_ticket/dual_screen');
@@ -58,6 +61,7 @@ class _PaymentSplitViewState extends State<PaymentSplitView> {
 
   double _cashAmount = 0.0;
   double _transferAmount = 0.0;
+  int _refNumberMinLength = 6; // default minimum length
 
   // สีหลัก (ปรับให้ดู Soft ลง)
   final Color _primaryColor = const Color(0xFF1A9A8B);
@@ -70,10 +74,30 @@ class _PaymentSplitViewState extends State<PaymentSplitView> {
     _transferAmount = widget.totalPrice;
 
     _cashInputController.addListener(_calculateRemaining);
+    _transferRefController.addListener(() {
+      log('📝 Ref text changed: ${_transferRefController.text} (length: ${_transferRefController.text.length})');
+      setState(() {}); // Rebuild to update button state
+    });
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    log('🚀 PaymentSplitView initState - Initial _refNumberMinLength: $_refNumberMinLength');
+
+    // Load ref min length first, then show QR
+    _loadRefMinLength().then((_) {
+      log('✅ _loadRefMinLength completed');
       _showQrOnCustomerScreen();
     });
+  }
+
+  Future<void> _loadRefMinLength() async {
+    log('⏳ Loading ref_number_min_length from storage...');
+    final refLength = await storage.read(key: 'ref_number_min_length');
+    log('📦 Read value from storage: "$refLength"');
+    if (mounted) {
+      setState(() {
+        _refNumberMinLength = int.tryParse(refLength ?? '6') ?? 6;
+      });
+      log('✅ Ref Number Min Length loaded: $_refNumberMinLength');
+    }
   }
 
   @override
@@ -93,6 +117,27 @@ class _PaymentSplitViewState extends State<PaymentSplitView> {
       _transferAmount = widget.totalPrice - _cashAmount;
       if (_transferAmount < 0) _transferAmount = 0;
     });
+  }
+
+  bool _canConfirm() {
+    // กำลัง process อยู่ → ไม่ให้กด
+    if (_isProcessing) return false;
+
+    // เงินสดเกิน/เท่ากับราคารวม → ไม่ให้กด (ไม่ต้องใช้โอนเงิน)
+    if (_cashAmount >= widget.totalPrice) return false;
+
+    // ถ้ามียอดโอนเงิน ต้องกรอก Ref ให้ครบตามจำนวน
+    if (_transferAmount > 0) {
+      final refText = _transferRefController.text.trim();
+      log('🔍 DEBUG: Ref Length = ${refText.length}, Min Required = $_refNumberMinLength');
+      if (refText.length < _refNumberMinLength) {
+        log('❌ Ref ไม่ครบ: ${refText.length} < $_refNumberMinLength');
+        return false; // Ref ไม่ครบ → ไม่ให้กด
+      }
+      log('✅ Ref ครบแล้ว: ${refText.length} >= $_refNumberMinLength');
+    }
+
+    return true;
   }
 
   Future<void> _showQrOnCustomerScreen() async {
@@ -291,17 +336,13 @@ class _PaymentSplitViewState extends State<PaymentSplitView> {
       }
 
       log('🧾 Navigating to ReceiptPage with ${apiResponses.length} responses...');
-      final bool? receiptResult = await Navigator.push(
+      await Navigator.push(
         context,
         MaterialPageRoute(
             builder: (context) => ReceiptPage(responses: apiResponses)),
       );
 
-      log('🧾 Receipt page result: $receiptResult');
-      if (receiptResult == true && mounted) {
-        log('✅ Closing payment view...');
-        Navigator.of(context).pop(true);
-      }
+      log('🧾 User returned from receipt page - staying on payment page');
     } catch (e) {
       log('❌ ERROR in _handleConfirmPayment: $e');
       log('❌ Stack trace: ${StackTrace.current}');
@@ -405,19 +446,25 @@ class _PaymentSplitViewState extends State<PaymentSplitView> {
                       const Divider(height: 24),
                       TextFormField(
                         controller: _transferRefController,
-                        decoration: const InputDecoration(
+                        autovalidateMode: AutovalidateMode.onUserInteraction,
+                        decoration: InputDecoration(
                           labelText: 'ເລກທີອ້າງອີງ (Ref No.)',
-                          hintText: 'Scan QR ແລະ ໃສ່ເລກ Ref',
-                          prefixIcon: Icon(Icons.qr_code),
+                          hintText:
+                              'Scan QR ແລະ ໃສ່ເລກ Ref ($_refNumberMinLength ຕົວຂື້ນໄປ)',
+                          prefixIcon: const Icon(Icons.qr_code),
                           filled: true,
-                          border: OutlineInputBorder(),
-                          contentPadding: EdgeInsets.symmetric(
+                          border: const OutlineInputBorder(),
+                          contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16, vertical: 12),
                         ),
                         validator: (value) {
-                          if (_transferAmount > 0 &&
-                              (value == null || value.isEmpty)) {
-                            return 'ກະລຸນາປ້ອນເລກ Ref';
+                          if (_transferAmount > 0) {
+                            if (value == null || value.isEmpty) {
+                              return 'ກະລຸນາປ້ອນເລກ Ref';
+                            }
+                            if (value.length < _refNumberMinLength) {
+                              return 'ເລກ Ref ຕ້ອງມີຢ່າງໜ້ອຍ $_refNumberMinLength ຕົວ';
+                            }
                           }
                           return null;
                         },
@@ -465,11 +512,8 @@ class _PaymentSplitViewState extends State<PaymentSplitView> {
                   const SizedBox(width: 16),
                   Expanded(
                     child: ElevatedButton(
-                      // ปิดปุ่มถ้า: กำลัง process หรือ เงินสดเกิน/เท่ากับราคารวม
-                      onPressed:
-                          (_isProcessing || _cashAmount >= widget.totalPrice)
-                              ? null
-                              : _handleConfirmPayment,
+                      // ปิดปุ่มถ้า: กำลัง process, เงินสดเกิน/เท่ากับราคารวม, หรือ Ref ไม่ครบ
+                      onPressed: _canConfirm() ? _handleConfirmPayment : null,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _primaryColor,
                         padding: const EdgeInsets.symmetric(vertical: 14),

@@ -233,18 +233,14 @@ class _PaymentQrViewState extends State<PaymentQrView> {
 
       if (!mounted) return;
 
-      final bool? receiptResult = await Navigator.push(
+      await Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => ReceiptPage(responses: apiResponses),
         ),
       );
 
-      if (receiptResult == true) {
-        if (mounted) {
-          Navigator.of(context).pop(true);
-        }
-      }
+      // User returned from receipt page - stay on payment page
     } catch (e) {
       log("--- ❌ API Error ---");
       log(e.toString());

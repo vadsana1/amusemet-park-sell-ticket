@@ -133,9 +133,10 @@ class _ShiftSummaryScreenState extends State<ShiftSummaryScreen> {
     final double adultSales = (summary?['adult_sales'] ?? 0).toDouble();
     final double childSales = (summary?['child_sales'] ?? 0).toDouble();
     final int totalTickets = summary?['total_tickets'] ?? 0;
-    final int totalVisitors = summary?['visitors']?['total'] ?? 0;
+    final int totalVisitors = totalTickets;
     final int adultVisitors = summary?['visitors']?['adults'] ?? 0;
     final int childVisitors = summary?['visitors']?['children'] ?? 0;
+    final List<dynamic> payments = summary?['payments'] ?? [];
     final String displayDate =
         summary?['date'] ?? DateFormat('yyyy-MM-dd').format(DateTime.now());
     final String displayTime =
@@ -210,6 +211,107 @@ class _ShiftSummaryScreenState extends State<ShiftSummaryScreen> {
                             ),
 
                             const SizedBox(height: 20),
+                            // Payment summary card at the bottom
+                            if (payments.isNotEmpty)
+                              Container(
+                                margin: const EdgeInsets.only(top: 10),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.grey.withOpacity(0.05),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16.0),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Icon(Icons.payment,
+                                              color: Colors.blue[700]),
+                                          const SizedBox(width: 8),
+                                          const Text(
+                                            'ສະຫຼຸບການຈ່າຍເງິນ',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 15,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const Divider(height: 20),
+                                      ...payments.map((p) {
+                                        final name = p['name'] ??
+                                            p['method'] ??
+                                            p['code'] ??
+                                            '';
+                                        final code = p['code'] ?? '';
+                                        final total = p['total'] ?? 0;
+                                        return Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                              vertical: 6.0),
+                                          child: Row(
+                                            children: [
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.all(6),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.blue[50],
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                ),
+                                                child: Icon(
+                                                  code == 'CASH'
+                                                      ? Icons
+                                                          .monetization_on_outlined
+                                                      : code == 'BANKTF'
+                                                          ? Icons
+                                                              .account_balance_outlined
+                                                          : Icons.credit_card,
+                                                  color: code == 'CASH'
+                                                      ? Colors.green
+                                                      : code == 'BANKTF'
+                                                          ? Colors.blue
+                                                          : Colors.orange,
+                                                  size: 18,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 12),
+                                              Expanded(
+                                                child: Text(
+                                                  name,
+                                                  style: const TextStyle(
+                                                      fontSize: 14,
+                                                      fontWeight:
+                                                          FontWeight.bold),
+                                                ),
+                                              ),
+                                              Text(
+                                                fmtNumber(total),
+                                                style: const TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 16),
+                                              ),
+                                              const SizedBox(width: 4),
+                                              const Text('₭',
+                                                  style: TextStyle(
+                                                      fontSize: 12,
+                                                      color: Colors.grey)),
+                                            ],
+                                          ),
+                                        );
+                                      }).toList(),
+                                    ],
+                                  ),
+                                ),
+                              ),
                           ],
                         ),
                       ),

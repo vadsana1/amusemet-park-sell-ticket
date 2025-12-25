@@ -58,6 +58,14 @@ class SellDayPassMultipleApi {
       log('🚀 [API] sellDayPassMultipleSplit - START');
 
       final baseUrl = await getBaseUrl();
+
+      // 🔥 เช็คว่า baseUrl ว่างหรือไม่
+      if (baseUrl.isEmpty) {
+        print(
+            '❌ [API] ERROR: Base URL is empty! Please configure in Settings.');
+        throw Exception('Base URL ຍັງບໍ່ໄດ້ຕັ້ງຄ່າ - ກະລຸນາໄປທີ່ການຕັ້ງຄ່າ');
+      }
+
       final headers = await getHeaders();
 
       final url = '$baseUrl/api/visitor/sell-day-pass/multiple-split';

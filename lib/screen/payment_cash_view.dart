@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import 'dart:developer';
+// import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../models/new_visitor_ticket.dart';
 import '../models/cart_item.dart';
@@ -11,6 +12,7 @@ import '../models/api_ticket_response.dart';
 import './receipt_page.dart';
 import '../services/newticket_api.dart';
 import '../services/newticket_multiple_api.dart';
+import '../utils/url_helper.dart' show storage;
 import '../utils/thousands_formatter.dart';
 
 class PaymentCashView extends StatefulWidget {
@@ -42,11 +44,16 @@ class PaymentCashView extends StatefulWidget {
 }
 
 class _PaymentCashViewState extends State<PaymentCashView> {
+  // [เพิ่ม] MethodChannel สำหรับจอลูกค้า (Dual Screen)
+  static final platform =
+      const MethodChannel('com.example.amusemet_park_sell_ticket/dual_screen');
   final VisitorApi _visitorApi = VisitorApi();
   final SellDayPassMultipleApi _visitorApiB = SellDayPassMultipleApi();
+  // 🔧 ใช้ global storage จาก url_helper แทน
 
   bool _isProcessing = false;
   bool _isTransferMode = false; // Transfer mode
+  int _refNumberMinLength = 6; // default minimum length
 
   final List<double> _denominations = const [
     1000,
@@ -80,6 +87,20 @@ class _PaymentCashViewState extends State<PaymentCashView> {
     _transferRefController.addListener(() {
       setState(() {});
     });
+    // Load ref min length from config
+    _loadRefMinLength();
+  }
+
+  Future<void> _loadRefMinLength() async {
+    log('⏳ [CashView] Loading ref_number_min_length from storage...');
+    final refLength = await storage.read(key: 'ref_number_min_length');
+    log('📦 [CashView] Read value from storage: "$refLength"');
+    if (mounted) {
+      setState(() {
+        _refNumberMinLength = int.tryParse(refLength ?? '6') ?? 6;
+      });
+      log('✅ [CashView] Ref Number Min Length loaded: $_refNumberMinLength');
+    }
   }
 
   @override
@@ -88,6 +109,7 @@ class _PaymentCashViewState extends State<PaymentCashView> {
     _transferRefController.dispose();
     _transferAmountController.dispose();
     _scrollController.dispose();
+    _resetCustomerScreen(); // [เพิ่ม] เคลียร์จอลูกค้าเมื่อออกจากหน้า cash view
     super.dispose();
   }
 
@@ -98,13 +120,51 @@ class _PaymentCashViewState extends State<PaymentCashView> {
         _transferAmount = 0.0;
         _transferRefController.clear();
         _transferAmountController.clear();
+        _resetCustomerScreen(); // [เพิ่ม] เคลียร์จอลูกค้าเมื่อออกจากโหมดโอน
       } else {
         // ตั้งค่าเริ่มต้นให้โอนเต็มจำนวน
         _transferAmount = widget.totalPrice - _amountReceived;
         if (_transferAmount < 0) _transferAmount = 0;
         _transferAmountController.text = currencyFormat.format(_transferAmount);
+        _showQrOnCustomerScreen(); // [เพิ่ม] แสดง QR ที่จอลูกค้าเมื่อเข้าโหมดโอน
       }
     });
+  }
+
+  // --- [เพิ่ม] ฟังก์ชันสำหรับส่งรูปไปจอลูกค้า (Dual Screen) ---
+  Future<void> _showQrOnCustomerScreen() async {
+    try {
+      log("--- 🖼️ กำลังส่งรูป QR ไปที่จอลูกค้า (จาก cash view) ---");
+      // 1. โหลดรูป QR จาก Assets
+      final ByteData data =
+          await rootBundle.load('assets/images/bank_qr_cropped.jpeg');
+      final Uint8List imageBytes = data.buffer.asUint8List();
+      // 2. เรียก native method ผ่าน MethodChannel
+      final bool success = await platform.invokeMethod('showImage', {
+        'imageBytes': imageBytes,
+      });
+      if (success) {
+        log("✅ QR displayed on customer screen (cash view)");
+      } else {
+        log("⚠️ Failed to display QR on customer screen (cash view)");
+      }
+    } catch (e) {
+      log("❌ Error showing QR on customer screen (cash view): $e");
+    }
+  }
+
+  // --- [เพิ่ม] ฟังก์ชันเคลียร์จอลูกค้า ---
+  Future<void> _resetCustomerScreen() async {
+    try {
+      final bool success = await platform.invokeMethod('clearScreen');
+      if (success) {
+        log("✅ Customer screen reset (cash view)");
+      } else {
+        log("⚠️ Failed to reset customer screen (cash view)");
+      }
+    } catch (e) {
+      log("❌ Error resetting screen (cash view): $e");
+    }
   }
 
   void _updateTransferAmount(String value) {
@@ -322,17 +382,21 @@ class _PaymentCashViewState extends State<PaymentCashView> {
         ),
       );
 
+      // ถ้าปริ้นเสร็จแล้ว (receiptResult == true) ให้กลับไปหน้า home
       if (receiptResult == true) {
         if (mounted) {
+          // ส่ง true กลับไปให้หน้าเลือกตั๋ว clear ข้อมูลและ pop กลับ home
           Navigator.of(context).pop(true);
         }
-      } else {
-        // ถ้ายกเลิกจากหน้าใบเสร็จ ให้ reset transfer mode
-        setState(() {
-          _isTransferMode = false;
-          _isProcessing = false;
-        });
+        return;
       }
+
+      // User returned from receipt page - stay on payment page
+      // Reset transfer mode if needed
+      setState(() {
+        _isTransferMode = false;
+        _isProcessing = false;
+      });
     } catch (e) {
       log("--- ❌ Split Payment API Error ---");
       log(e.toString());
@@ -377,11 +441,13 @@ class _PaymentCashViewState extends State<PaymentCashView> {
     }
 
     // ຖ້າອຍູ່ໃນໂໝດໂອນ ຕ້ອງກໍານເລກ Ref
-    if (_isTransferMode && _transferRefController.text.trim().isEmpty) {
+    if (_isTransferMode &&
+        _transferRefController.text.trim().length < _refNumberMinLength) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('ກະລຸນາກໍານເລກອ້າງອີງການໂອນ'),
+          SnackBar(
+            content: Text(
+                'ກະລຸນາກໍານເລກອ້າງອີງການໂອນຢ່າງໜ້ອຍ $_refNumberMinLength ຕົວ'),
             backgroundColor: Colors.red,
           ),
         );
@@ -492,7 +558,6 @@ class _PaymentCashViewState extends State<PaymentCashView> {
           ...visitorDetails,
         };
         log('Payload 1-Ticket (Flat) Sent: ${json.encode(flatPayload)}');
-        
 
         final Map<String, dynamic> responseMap = await _visitorApi.sellDayPass(
           flatPayload,
@@ -578,16 +643,20 @@ class _PaymentCashViewState extends State<PaymentCashView> {
         ),
       );
 
+      // ถ้าปริ้นเสร็จแล้ว (receiptResult == true) ให้กลับไปหน้า home
       if (receiptResult == true) {
         if (mounted) {
+          // ส่ง true กลับไปให้หน้าเลือกตั๋ว clear ข้อมูลและ pop กลับ home
           Navigator.of(context).pop(true);
         }
-      } else {
-        // ถ้ายกเลิกจากหน้าใบเสร็จ ให้ reset state
-        setState(() {
-          _isProcessing = false;
-        });
+        return;
       }
+
+      // User returned from receipt page - stay on payment page
+      // Reset state
+      setState(() {
+        _isProcessing = false;
+      });
     } catch (e) {
       log("--- ❌ API Error ---");
       log(e.toString());
@@ -620,13 +689,14 @@ class _PaymentCashViewState extends State<PaymentCashView> {
     bool canConfirm;
     if (_isTransferMode) {
       // ໃນໂໝດໂອນ: ຕ້ອງກໍານເລກ Ref ແລະຍອດຄໍບ
-      canConfirm = _transferRefController.text.trim().isNotEmpty &&
-          (_amountReceived + _transferAmount) >= widget.totalPrice &&
-          !_isProcessing;
+      canConfirm =
+          _transferRefController.text.trim().length >= _refNumberMinLength &&
+              (_amountReceived + _transferAmount) >= widget.totalPrice &&
+              !_isProcessing;
 
       // Debug log - แสดงเมื่อมีการกดธนบัตร
       if (_amountReceived > 0) {
-        log('💰 Transfer Mode Check: cash=$_amountReceived, transfer=$_transferAmount, total=${_amountReceived + _transferAmount}, required=${widget.totalPrice}, ref=${_transferRefController.text.length} chars, canConfirm=$canConfirm');
+        log('💰 Transfer Mode Check: cash=$_amountReceived, transfer=$_transferAmount, total=${_amountReceived + _transferAmount}, required=${widget.totalPrice}, ref=${_transferRefController.text.length}/$_refNumberMinLength chars, canConfirm=$canConfirm');
       }
     } else {
       // ໂໝດປກຕິ: ຕ້ອງมີເງິນຄໍບ
@@ -779,10 +849,16 @@ class _PaymentCashViewState extends State<PaymentCashView> {
             readOnly: _isProcessing,
             decoration: InputDecoration(
               labelText: 'ເລກອ້າງອີງ (Ref)',
-              hintText: 'ປ້ອນເລກ Ref ການໂອນ',
+              hintText: 'ປ້ອນເລກ Ref ການໂອນ ($_refNumberMinLength ຕົວຂື້ນໄປ)',
+              errorText: (_transferRefController.text.trim().length <
+                          _refNumberMinLength &&
+                      _transferRefController.text.isNotEmpty)
+                  ? 'ຕ້ອງກໍານຂັ້ນຕ່ຳ $_refNumberMinLength ຕົວ'
+                  : null,
               border: OutlineInputBorder(
                 borderSide: BorderSide(
-                  color: (_transferRefController.text.trim().length < 5)
+                  color: (_transferRefController.text.trim().length <
+                          _refNumberMinLength)
                       ? Colors.red
                       : Colors.grey,
                   width: 1,
@@ -790,7 +866,8 @@ class _PaymentCashViewState extends State<PaymentCashView> {
               ),
               enabledBorder: OutlineInputBorder(
                 borderSide: BorderSide(
-                  color: (_transferRefController.text.trim().length < 5)
+                  color: (_transferRefController.text.trim().length <
+                          _refNumberMinLength)
                       ? Colors.red
                       : Colors.grey,
                   width: 1,
@@ -798,7 +875,8 @@ class _PaymentCashViewState extends State<PaymentCashView> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderSide: BorderSide(
-                  color: (_transferRefController.text.trim().length < 5)
+                  color: (_transferRefController.text.trim().length <
+                          _refNumberMinLength)
                       ? Colors.red
                       : Colors.blue,
                   width: 2,

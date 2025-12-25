@@ -29,14 +29,21 @@ class _ConfigPageState extends State<ConfigPage> {
   Future<void> _loadConfig() async {
     setState(() => _isLoading = true);
     try {
+      print('📖 [CONFIG] Loading config from storage...');
       final token = await _storage.read(key: 'base_token') ?? '';
       final baseUrl = await _storage.read(key: 'base_url') ?? '';
+
+      print('📖 [CONFIG] Loaded:');
+      print(
+          '   Token: ${token.isEmpty ? "EMPTY" : "${token.substring(0, 10)}... (${token.length} chars)"}');
+      print('   URL: ${baseUrl.isEmpty ? "EMPTY" : baseUrl}');
 
       setState(() {
         _tokenController.text = token;
         _baseUrlController.text = baseUrl;
       });
     } catch (e) {
+      print('❌ [CONFIG] Load error: $e');
       _showMessage('Error loading config: ${e.toString()}', isError: true);
     } finally {
       setState(() => _isLoading = false);
@@ -47,14 +54,28 @@ class _ConfigPageState extends State<ConfigPage> {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
       try {
+        final token = _tokenController.text.trim();
+        final url = _baseUrlController.text.trim();
+
+        print('💾 [CONFIG] Saving config...');
+        print('   Token: ${token.substring(0, 10)}... (${token.length} chars)');
+        print('   URL: $url');
+
         await _storage.write(
           key: 'base_token',
-          value: _tokenController.text.trim(),
+          value: token,
         );
         await _storage.write(
           key: 'base_url',
-          value: _baseUrlController.text.trim(),
+          value: url,
         );
+
+        // 🔍 Verify ว่า save สำเร็จ
+        final savedToken = await _storage.read(key: 'base_token');
+        final savedUrl = await _storage.read(key: 'base_url');
+        print('✅ [CONFIG] Saved successfully!');
+        print('   Verified Token: ${savedToken?.substring(0, 10)}...');
+        print('   Verified URL: $savedUrl');
 
         _showMessage('ບັນທຶກຂໍ້ມູນສຳເລັດ!', isError: false);
       } catch (e) {
