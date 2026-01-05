@@ -3,7 +3,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/sticker_printer_service.dart';
-import 'qr_dual_screen_tab.dart';
 
 class SettingConfig extends StatefulWidget {
   const SettingConfig({super.key});
@@ -84,11 +83,11 @@ class _SettingConfigState extends State<SettingConfig>
       ),
       body: TabBarView(
         controller: _tabController,
-        children: [
-          const PrintSettingsTab(),
-          const PaymentSettingsTab(),
-          const PrinterConnectionTab(),
-          const QrDualScreenTab(), // [เปิดใช้งาน] แท็บใหม่สำหรับ QR ຈໍສອງ
+        children: const [
+          PrintSettingsTab(),
+          PaymentSettingsTab(),
+          PrinterConnectionTab(),
+          // QrDualScreenTab(), // [เพิ่ม] แท็บใหม่สำหรับ QR ຈໍສອງ
         ],
       ),
     );

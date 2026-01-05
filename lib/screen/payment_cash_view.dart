@@ -1,4 +1,6 @@
 ﻿import 'dart:convert';
+import 'dart:typed_data';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -135,10 +137,20 @@ class _PaymentCashViewState extends State<PaymentCashView> {
   Future<void> _showQrOnCustomerScreen() async {
     try {
       log("--- 🖼️ กำลังส่งรูป QR ไปที่จอลูกค้า (จาก cash view) ---");
-      // 1. โหลดรูป QR จาก Assets
-      final ByteData data =
-          await rootBundle.load('assets/images/bank_qr_cropped.jpeg');
-      final Uint8List imageBytes = data.buffer.asUint8List();
+      // 1. พยายามโหลด QR จาก FlutterSecureStorage
+      final storage = const FlutterSecureStorage();
+      Uint8List? imageBytes;
+      final base64Str = await storage.read(key: 'qr_image_base64');
+      if (base64Str != null && base64Str.isNotEmpty) {
+        imageBytes = base64Decode(base64Str);
+        log("ใช้ QR จาก storage");
+      } else {
+        // ถ้าไม่มีใน storage ให้ fallback เป็น asset เดิม
+        final ByteData data =
+            await rootBundle.load('assets/images/bank_qr_cropped.jpeg');
+        imageBytes = data.buffer.asUint8List();
+        log("ใช้ QR จาก asset");
+      }
       // 2. เรียก native method ผ่าน MethodChannel
       final bool success = await platform.invokeMethod('showImage', {
         'imageBytes': imageBytes,
