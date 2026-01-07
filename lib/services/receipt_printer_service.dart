@@ -1,10 +1,14 @@
 // [ FILE: lib/services/receipt_printer_service.dart ]
 
 import 'dart:developer';
+import 'dart:typed_data';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:intl/intl.dart';
 import 'package:imin_printer/imin_printer.dart';
 import 'package:imin_printer/enums.dart';
 import 'package:imin_printer/imin_style.dart';
+import 'package:imin_printer/column_maker.dart';
+import 'package:image/image.dart' as img;
 import '../models/api_ticket_response.dart';
 
 class ReceiptPrinterService {
@@ -138,6 +142,40 @@ class ReceiptPrinterService {
     final String timeString = timeFormat.format(now);
 
     // ==========================================
+    // 🆕 Print Logo at top right (pad with white space on left)
+    // ==========================================
+    try {
+      // Load logo from assets as bytes
+      final ByteData logoData =
+          await rootBundle.load('assets/images/logo_bw.png');
+      final Uint8List logoBytes = logoData.buffer.asUint8List();
+
+      // Decode and resize image to 120px width for thermal printer
+      final img.Image? originalImage = img.decodeImage(logoBytes);
+      if (originalImage != null) {
+        final img.Image resizedLogo = img.copyResize(originalImage, width: 120);
+
+        const int paperWidth = 340;
+        final img.Image fullWidthImage = img.Image(
+          width: paperWidth,
+          height: resizedLogo.height,
+        );
+        // Fill with white background
+        img.fill(fullWidthImage, color: img.ColorRgb8(255, 255, 255));
+        // Paste logo on the right side
+        img.compositeImage(fullWidthImage, resizedLogo,
+            dstX: paperWidth - resizedLogo.width);
+
+        final Uint8List paddedBytes =
+            Uint8List.fromList(img.encodePng(fullWidthImage));
+        // Print the padded image (logo will appear on right)
+        await iminPrinter.printSingleBitmap(paddedBytes);
+      }
+    } catch (e) {
+      log('Logo print error (continuing): $e');
+    }
+
+    // ==========================================
     // Header Section: Left aligned, Date/Time on separate lines
     // ==========================================
 
@@ -209,11 +247,11 @@ class ReceiptPrinterService {
       }
     }
 
-    await iminPrinter.printText('------------------------------------------');
+    await _printDivider();
 
     // --- Payment details ---
     await _printRow(
-      'ລາຄາທັງຫມົດ:',
+      'ລາຄາທັງໝົດ:',
       '${currencyFormat.format(response.amountDue)} ກີບ',
       isBold: true,
     );
@@ -349,40 +387,42 @@ class ReceiptPrinterService {
     await iminPrinter.partialCut();
   }
 
-  /// (Helper) Print 2-column aligned text (for 80mm paper)
+  /// (Helper) Print label and value on same line using columns
   Future<void> _printRow(
     String label,
     String value, {
-    bool isBold = false,
+    bool isBold = true,
   }) async {
-    // Define fixed label width of 20 characters
-    const int labelWidth = 20;
-    const int totalWidth = 54;
+    // Use printColumnsText for same-line label (left) and value (right)
+    await iminPrinter.printColumnsText(
+      cols: [
+        ColumnMaker(
+          text: label,
+          width: 1,
+          align: IminPrintAlign.left,
+          fontSize: isBold ? 24 : 22,
+        ),
+        ColumnMaker(
+          text: value,
+          width: 1,
+          align: IminPrintAlign.right,
+          fontSize: isBold ? 24 : 22,
+        ),
+      ],
+    );
+    // Add vertical spacing after row
+    await iminPrinter.printAndLineFeed();
+  }
 
-    // Calculate actual length (excluding Lao vowels)
-    int labelLen = _getVisibleLength(label);
-    int valueLen = _getVisibleLength(value);
-
-    // Pad label with spaces to reach labelWidth
-    int labelSpaces = labelWidth - labelLen;
-    if (labelSpaces < 0) labelSpaces = 0;
-
-    String paddedLabel = label + (' ' * labelSpaces);
-
-    // Calculate space between label and value
-    int remainingWidth = totalWidth - labelWidth - valueLen;
-    if (remainingWidth < 1) remainingWidth = 1;
-
-    String spaces = ' ' * remainingWidth;
-    String line = '$paddedLabel$spaces$value';
-
+  /// (Helper) Print horizontal divider line
+  Future<void> _printDivider() async {
+    // Use underline character for cleaner line look
     await iminPrinter.printText(
-      line,
+      '─' * 39, // Unicode horizontal line (shorter to fit paper)
       style: IminTextStyle(
-        fontSize: isBold ? 24 : 22,
-        align: IminPrintAlign.left,
-        fontStyle: isBold ? IminFontStyle.bold : IminFontStyle.normal,
-      ),
+          fontSize: 16,
+          align: IminPrintAlign.center,
+          fontStyle: IminFontStyle.bold),
     );
   }
 

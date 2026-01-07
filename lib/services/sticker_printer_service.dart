@@ -59,15 +59,25 @@ class StickerPrinterService {
   static final StickerPrinterService instance =
       StickerPrinterService._privateConstructor();
 
-  final FlutterUsbPrinter _printer = FlutterUsbPrinter();
+  // 🔧 Use mutable printer instance - recreate on reconnect to fix stale state
+  FlutterUsbPrinter _printer = FlutterUsbPrinter();
 
   final ValueNotifier<bool> isConnectedNotifier = ValueNotifier<bool>(false);
 
-  // 🆕 Notifier สำหรับแจ้งเตือนเมื่อต้องการให้เชื่อมต่อใหม่
+  // 🆕 Notifier สำหรับแจ้งเตือนเมื่อ auto-connect สำเร็จ (show SnackBar)
   final ValueNotifier<bool> needsReconnectNotifier = ValueNotifier<bool>(false);
+
+  // 🆕 Notifier สำหรับแจ้งเตือนเมื่อต้องการ manual reconnect (USB replugged - navigate to config page)
+  final ValueNotifier<bool> needsManualReconnectNotifier =
+      ValueNotifier<bool>(false);
+
+  // 🆕 Notifier for showing loading dialog during auto-reconnection
+  final ValueNotifier<bool> isReconnectingNotifier = ValueNotifier<bool>(false);
 
   Map<String, dynamic>? _connectedDevice;
   Timer? _connectionCheckTimer;
+  // 🆕 Flag to track if we were previously connected (to handle replug scenario)
+  bool _wasPreviouslyConnected = false;
 
   void setConnectionStatus(bool isConnected, [Map<String, dynamic>? device]) {
     if (isConnectedNotifier.value != isConnected) {
@@ -77,12 +87,13 @@ class StickerPrinterService {
     debugPrint(
         'SERVICE STATUS UPDATED: ${isConnected ? "CONNECTED" : "DISCONNECTED"}');
 
-    // 🆕 เมื่อเชื่อมต่อสำเร็จ เริ่มตรวจสอบการเชื่อมต่อแบบ periodic
+    // 🔧 เริ่ม monitoring เมื่อเชื่อมต่อสำเร็จ
+    // 🔧 แต่ไม่หยุด monitoring เมื่อ disconnect - เพื่อให้ตรวจจับการเสียบใหม่ได้
     if (isConnected) {
+      _wasPreviouslyConnected = true;
       startConnectionMonitoring();
-    } else {
-      stopConnectionMonitoring();
     }
+    // Don't stop monitoring on disconnect - we need it to detect USB replug!
   }
 
   // 🆕 เริ่มตรวจสอบการเชื่อมต่อแบบ periodic
@@ -127,10 +138,10 @@ class StickerPrinterService {
       );
 
       if (matchedDevice.isEmpty && isConnectedNotifier.value) {
-        // อุปกรณ์ถูกถอดออก
+        // อุปกรณ์ถูกถอดออก - just disconnect, no dialog
         debugPrint('⚠️ USB Device disconnected - not in device list');
         setConnectionStatus(false);
-        needsReconnectNotifier.value = true; // แจ้งให้ reconnect
+        // Don't set needsReconnectNotifier - auto-reconnect will handle it when replugged
       } else if (matchedDevice.isNotEmpty) {
         // เช็คว่า deviceId เปลี่ยนหรือไม่ (หลังจากถอด-เสียบใหม่)
         final oldDeviceId = _connectedDevice!['deviceId']?.toString();
@@ -142,15 +153,21 @@ class StickerPrinterService {
           debugPrint(
               '⚠️ Device ID changed: $oldDeviceId → $newDeviceId (USB re-plugged)');
           debugPrint(
-              '❌ Connection is STALE - disconnecting and notifying user');
+              '🔧 Need manual reconnect - notify UI to navigate to Printer Config');
 
-          // Disconnect แล้วให้ user reconnect manually เพื่อความแน่ใจ
+          // Disconnect and notify UI to show dialog for manual reconnect
           await disconnect();
-          needsReconnectNotifier.value = true; // แจ้งให้ UI แสดง dialog
+          // 🆕 Trigger manual reconnect dialog (navigate to config page)
+          needsManualReconnectNotifier.value = true;
         } else if (!isConnectedNotifier.value) {
-          // อุปกรณ์เสียบกลับมา (และเรายังไม่ได้เชื่อมต่อ)
-          debugPrint('✅ USB Device reconnected - notifying user');
-          needsReconnectNotifier.value = true; // แจ้งให้ UI แสดง dialog
+          // อุปกรณ์เสียบกลับมา (และเรายังไม่ได้เชื่อมต่อ) - auto reconnect!
+          debugPrint('🔌 USB Device reconnected - auto-connecting...');
+          final success = await connect(matchedDevice);
+          if (success) {
+            debugPrint('✅ Auto-reconnected successfully!');
+            needsReconnectNotifier.value =
+                true; // แจ้ง UI ว่าเชื่อมต่อแล้ว (สำหรับ SnackBar)
+          }
         }
       }
     } catch (e) {
@@ -163,35 +180,91 @@ class StickerPrinterService {
     }
   }
 
-  // 🆕 ตรวจจับว่ามีอุปกรณ์ที่เคยเชื่อมต่อเสียบเข้ามาหรือไม่
+  // 🆕 ตรวจจับว่ามีอุปกรณ์ที่เคยเชื่อมต่อหรือ TSC printer เสียบเข้ามาหรือไม่
+  // 🆕 ตรวจจับว่ามีอุปกรณ์ที่เคยเชื่อมต่อหรือ TSC printer เสียบเข้ามาหรือไม่
   Future<void> _checkForReconnectedDevice() async {
     try {
+      final devices = await scanDevices();
+      debugPrint(
+          '🔍 CheckReconnected: Devices=${devices.length}, Connected=${isConnectedNotifier.value}, WasPrevConnected=$_wasPreviouslyConnected');
+      if (devices.isEmpty || isConnectedNotifier.value) return;
+
       final prefs = await SharedPreferences.getInstance();
       final String? lastVid = prefs.getString('tsc_last_vid');
       final String? lastPid = prefs.getString('tsc_last_pid');
 
-      if (lastVid == null || lastPid == null) return;
+      // First priority: Check for last saved device
+      if (lastVid != null && lastPid != null) {
+        final match = devices.firstWhere(
+          (d) =>
+              d['vendorId'].toString() == lastVid &&
+              d['productId'].toString() == lastPid,
+          orElse: () => {},
+        );
 
-      final devices = await scanDevices();
-      final match = devices.firstWhere(
-        (d) =>
-            d['vendorId'].toString() == lastVid &&
-            d['productId'].toString() == lastPid,
+        if (match.isNotEmpty) {
+          debugPrint('🔌 Previously connected device found');
+
+          // 🔧 AUTO-RECONNECT on replug (plugin fixed - now works reliably!)
+          if (_wasPreviouslyConnected) {
+            debugPrint(
+                '🔧 Replug detected - attempting silent auto-reconnect...');
+            isReconnectingNotifier.value = true; // Show loading dialog
+          } else {
+            debugPrint('⚡ First connection detected - auto-connecting...');
+          }
+
+          if (match['productName'] == null ||
+              match['productName'].toString().isEmpty) {
+            match['productName'] = 'USB Printer (VID:$lastVid PID:$lastPid)';
+          }
+
+          final success = await connect(match);
+          isReconnectingNotifier.value = false; // Hide loading dialog
+
+          if (success) {
+            debugPrint('✅ Auto-connected to printer!');
+            needsReconnectNotifier.value = true; // Show SnackBar notification
+          } else {
+            debugPrint('❌ Auto-connect failed');
+          }
+          return;
+        }
+      }
+
+      // Second priority: Check for ANY known TSC printer (VID: 4611)
+      const int tscVendorId = 4611;
+      final tscDevice = devices.firstWhere(
+        (d) => int.tryParse(d['vendorId'].toString()) == tscVendorId,
         orElse: () => {},
       );
 
-      if (match.isNotEmpty && !isConnectedNotifier.value) {
-        // พบอุปกรณ์ที่เคยเชื่อมต่อ และยังไม่ได้เชื่อมต่อ
-        debugPrint('✅ Previously connected device found - notifying user');
+      if (tscDevice.isNotEmpty) {
+        debugPrint('🔌 TSC printer (VID:4611) detected');
 
-        // 🔧 เพิ่มชื่อสำรองถ้า productName เป็น null
-        if (match['productName'] == null ||
-            match['productName'].toString().isEmpty) {
-          match['productName'] = 'USB Printer (VID:$lastVid PID:$lastPid)';
+        // 🔧 AUTO-RECONNECT on replug (plugin fixed - now works reliably!)
+        if (_wasPreviouslyConnected) {
+          debugPrint(
+              '🔧 Replug detected - attempting silent auto-reconnect...');
+          isReconnectingNotifier.value = true; // Show loading dialog
+        } else {
+          debugPrint('⚡ First connection detected - auto-connecting...');
         }
 
-        _connectedDevice = match; // เก็บข้อมูลอุปกรณ์ไว้
-        needsReconnectNotifier.value = true;
+        if (tscDevice['productName'] == null ||
+            tscDevice['productName'].toString().isEmpty) {
+          tscDevice['productName'] = 'TSC Printer';
+        }
+
+        final success = await connect(tscDevice);
+        isReconnectingNotifier.value = false; // Hide loading dialog
+
+        if (success) {
+          debugPrint('✅ Auto-connected to TSC printer!');
+          needsReconnectNotifier.value = true; // Show SnackBar notification
+        } else {
+          debugPrint('❌ Auto-connect to TSC printer failed');
+        }
       }
     } catch (e) {
       debugPrint('Check for reconnected device error: $e');
@@ -268,36 +341,69 @@ class StickerPrinterService {
     }
   }
 
-  // Auto-connect to last saved device (VID/PID) if available
+  // Auto-connect to last saved device (VID/PID) if available, or any known TSC printer
   Future<void> autoConnectOnStartup() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final String? lastVid = prefs.getString('tsc_last_vid');
       final String? lastPid = prefs.getString('tsc_last_pid');
-      if (lastVid == null || lastPid == null) {
-        // 🆕 ถึงแม้ไม่มีอุปกรณ์ที่บันทึกไว้ ก็เริ่ม monitoring เพื่อตรวจจับการเสียบใหม่
+
+      final devices = await scanDevices();
+
+      if (devices.isEmpty) {
+        debugPrint('🔍 No USB devices found - starting monitoring');
         startConnectionMonitoring();
         return;
       }
 
-      final devices = await scanDevices();
-      final match = devices.firstWhere(
-        (d) =>
-            d['vendorId'].toString() == lastVid &&
-            d['productId'].toString() == lastPid,
+      // First priority: Try to connect to last saved device
+      if (lastVid != null && lastPid != null) {
+        final match = devices.firstWhere(
+          (d) =>
+              d['vendorId'].toString() == lastVid &&
+              d['productId'].toString() == lastPid,
+          orElse: () => {},
+        );
+        if (match.isNotEmpty) {
+          if (match['productName'] == null ||
+              match['productName'].toString().isEmpty) {
+            match['productName'] = 'USB Printer (VID:$lastVid PID:$lastPid)';
+          }
+          debugPrint(
+              '🔌 Auto-connecting to saved device VID:$lastVid PID:$lastPid...');
+          final success = await connect(match);
+          if (success) {
+            debugPrint('✅ Auto-connected to saved device!');
+            return;
+          }
+        }
+      }
+
+      // Second priority: Try to connect to ANY known TSC printer (VID: 4611)
+      // This allows first-time auto-connect without manual pairing
+      const int tscVendorId = 4611; // TSC Printer VID
+      final tscDevice = devices.firstWhere(
+        (d) => int.tryParse(d['vendorId'].toString()) == tscVendorId,
         orElse: () => {},
       );
-      if (match.isNotEmpty) {
-        // 🔧 เพิ่มชื่อสำรองถ้า productName เป็น null (เพื่อแสดงใน permission dialog)
-        if (match['productName'] == null ||
-            match['productName'].toString().isEmpty) {
-          match['productName'] = 'USB Printer (VID:$lastVid PID:$lastPid)';
+
+      if (tscDevice.isNotEmpty) {
+        if (tscDevice['productName'] == null ||
+            tscDevice['productName'].toString().isEmpty) {
+          tscDevice['productName'] = 'TSC Printer';
         }
-        await connect(match);
-      } else {
-        // 🆕 ถ้าไม่พบอุปกรณ์ ให้เริ่ม monitoring เพื่อรอการเสียบ
-        startConnectionMonitoring();
+        debugPrint('🔌 Found TSC printer (VID:4611) - auto-connecting...');
+        final success = await connect(tscDevice);
+        if (success) {
+          debugPrint('✅ Auto-connected to TSC printer!');
+          needsReconnectNotifier.value = true; // Notify UI
+          return;
+        }
       }
+
+      // No known printers found - start monitoring
+      debugPrint('🔍 No known printers found - starting monitoring');
+      startConnectionMonitoring();
     } catch (e) {
       debugPrint('AutoConnect error: $e');
       // 🆕 เริ่ม monitoring แม้เกิด error
@@ -322,30 +428,71 @@ class StickerPrinterService {
       // 🔍 แสดงข้อมูลอุปกรณ์ที่กำลังพยายามเชื่อมต่อ
       debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       debugPrint('🔌 กำลังเชื่อมต่อกับอุปกรณ์:');
-      // debugPrint('   📛 ชื่อ: {device['productName'] ?? 'Unknown'}');
-      // debugPrint('   ผู้ผลิต: ${device['manufacturer'] ?? 'Unknown'}');
-      // debugPrint('   🔢 VID: ${device['vendorId']}');
-      // debugPrint('   🔢 PID: ${device['productId']}');
-      // debugPrint('   📍 Device: ${device['deviceName']}');
+      debugPrint('   VID: ${device['vendorId']}, PID: ${device['productId']}');
+      debugPrint('   DeviceId: ${device['deviceId']}');
       debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
-      // Close any existing connection first
+      // 🔧 NUCLEAR RESET: Aggressively close and destroy everything
+      debugPrint('🔥 Starting NUCLEAR USB reset...');
+
+      // Close attempt 1
       try {
         await _printer.close();
-        await Future.delayed(const Duration(milliseconds: 300));
-      } catch (closeError) {
-        debugPrint('Close previous connection: $closeError');
+        debugPrint('🧹 Close attempt 1 completed');
+      } catch (e) {
+        debugPrint('Close attempt 1: $e');
       }
+      await Future.delayed(const Duration(milliseconds: 500));
 
-      // 🔑 เชื่อมต่อโดยตรง (device_filter.xml จะทำให้ Android auto-grant permission)
+      // Destroy old instance and create new
+      _printer = FlutterUsbPrinter();
+      debugPrint('🆕 Created fresh printer instance #1');
+
+      // Close attempt 2 (on new instance to clear any static state)
+      try {
+        await _printer.close();
+        debugPrint('🧹 Close attempt 2 completed');
+      } catch (e) {
+        debugPrint('Close attempt 2: $e');
+      }
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      // Destroy and recreate again
+      _printer = FlutterUsbPrinter();
+      debugPrint('🆕 Created fresh printer instance #2 (final)');
+
+      // Wait for Android USB subsystem to fully reset
+      debugPrint('⏳ Waiting 2s for Android USB reset...');
+      await Future.delayed(const Duration(milliseconds: 2000));
+
+      // 🔑 Connect with fresh instance
       final int vid = int.parse(device['vendorId'].toString());
       final int pid = int.parse(device['productId'].toString());
 
+      debugPrint('📡 Attempting USB connect to VID:$vid PID:$pid...');
       await _printer.connect(vid, pid);
 
+      // 🔧 Wait after connect to ensure stable connection
+      await Future.delayed(const Duration(milliseconds: 1000));
+
+      // 🔥 VERIFICATION: Send a test command to verify USB actually works
+      debugPrint('🧪 Verifying USB connection with test write...');
+      try {
+        final testData = Uint8List.fromList(utf8.encode("CLS\r\n"));
+        final testResult = await _printer.write(testData);
+        if (testResult == true) {
+          debugPrint('✅ USB verification PASSED - connection is working!');
+        } else {
+          debugPrint(
+              '⚠️ USB verification returned false - connection may be unreliable');
+        }
+      } catch (verifyError) {
+        debugPrint('❌ USB verification FAILED: $verifyError');
+        // Don't fail connect, but log the issue
+      }
+
       setConnectionStatus(true, device);
-      // debugPrint('✅ เชื่อมต่อสำเร็จกับ: ${device['productName'] ?? 'Unknown'}');
-      // debugPrint('   VID: ${device['vendorId']}, PID: ${device['productId']}');
+      debugPrint('✅ Connected successfully to VID:$vid PID:$pid');
       debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       // persist for auto-connect next time
       await _saveLastDevice(device);
@@ -373,14 +520,25 @@ class StickerPrinterService {
   Future<bool> restartConnection() async {
     debugPrint('🔄 Restarting connection...');
 
-    if (_connectedDevice == null) {
-      debugPrint('❌ No device info to reconnect');
-      return false;
+    String? oldVid;
+    String? oldPid;
+
+    // Try to get VID/PID from current device or fallback to saved preferences
+    if (_connectedDevice != null) {
+      oldVid = _connectedDevice!['vendorId'].toString();
+      oldPid = _connectedDevice!['productId'].toString();
+    } else {
+      // Fallback to saved VID/PID from SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      oldVid = prefs.getString('tsc_last_vid');
+      oldPid = prefs.getString('tsc_last_pid');
+      debugPrint('🔍 Using saved VID:$oldVid PID:$oldPid from preferences');
     }
 
-    // เก็บ VID/PID ไว้เพื่อค้นหา device ใหม่
-    final oldVid = _connectedDevice!['vendorId'].toString();
-    final oldPid = _connectedDevice!['productId'].toString();
+    if (oldVid == null || oldPid == null) {
+      debugPrint('❌ No device info to reconnect (no saved device)');
+      return false;
+    }
 
     // ปิด connection เก่า
     await disconnect();
@@ -422,6 +580,25 @@ class StickerPrinterService {
 
     if (success) {
       debugPrint('✅ Connection restarted successfully with new deviceId');
+
+      // 🔧 CRITICAL: Send a "warmup" command to verify USB endpoint is truly active
+      debugPrint('🔥 Sending warmup command to verify connection...');
+      try {
+        await Future.delayed(const Duration(milliseconds: 500));
+        // Send a simple TSPL command that does nothing visible but tests USB write
+        final warmupData = Uint8List.fromList(utf8.encode("CLS\r\n"));
+        final warmupResult = await _printer.write(warmupData);
+
+        if (warmupResult == true) {
+          debugPrint('✅ Warmup successful - USB write working!');
+        } else {
+          debugPrint(
+              '⚠️ Warmup returned false/null - connection may be unstable');
+        }
+      } catch (warmupError) {
+        debugPrint('❌ Warmup failed: $warmupError - connection is NOT working');
+        // Don't return false here, let the print function handle retry
+      }
     } else {
       debugPrint('❌ Failed to restart connection');
     }

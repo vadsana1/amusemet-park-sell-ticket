@@ -369,6 +369,17 @@ class _ReceiptPageState extends State<ReceiptPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
+          // 🆕 Logo at top right
+          Align(
+            alignment: Alignment.centerRight,
+            child: Image.asset(
+              'assets/images/logo_dern_that_wonderland.png',
+              width: 80,
+              height: 80,
+              cacheWidth: 160, // Memory-efficient loading
+            ),
+          ),
+          const SizedBox(height: 8),
           _buildHeader(response, isFinancialReceipt: true),
 
           // 🟢 Divider line
@@ -548,16 +559,37 @@ class _ReceiptPageState extends State<ReceiptPage> {
               flex: 6,
               child: Column(
                 children: [
-                  // 1. Shop Name Laodoove (Right Aligned)
-                  const Align(
+                  // 1. Logo and Shop Name (Right Aligned)
+                  Align(
                     alignment: Alignment.centerRight,
-                    child: Text(
-                      'Laodoove',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        // Logo - resized via cacheWidth for memory efficiency
+                        Image.asset(
+                          'assets/images/logo_dern_that_wonderland.png',
+                          width: 55,
+                          height: 55,
+                          cacheWidth: 110, // Memory-efficient loading
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Dern That',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black,
+                          ),
+                        ),
+                        const Text(
+                          'Wonderland',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
 

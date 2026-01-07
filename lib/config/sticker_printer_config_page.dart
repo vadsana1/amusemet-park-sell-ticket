@@ -4,7 +4,10 @@ import '../services/sticker_printer_service.dart';
 
 // Simple Status & Reconnect Page
 class StickerPrinterConfigPage extends StatefulWidget {
-  const StickerPrinterConfigPage({super.key});
+  // 🆕 Auto-trigger connect when page opens (for USB replug scenario)
+  final bool autoConnect;
+
+  const StickerPrinterConfigPage({super.key, this.autoConnect = false});
 
   @override
   State<StickerPrinterConfigPage> createState() =>
@@ -21,6 +24,59 @@ class _StickerPrinterConfigPageState extends State<StickerPrinterConfigPage> {
   void initState() {
     super.initState();
     _checkCurrentConnection();
+
+    // 🆕 Auto-trigger connect if requested (USB replug scenario)
+    if (widget.autoConnect) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _handleAutoReconnect();
+        }
+      });
+    }
+  }
+
+  // 🆕 Handle auto-reconnection for USB replug scenario
+  Future<void> _handleAutoReconnect() async {
+    debugPrint('🔄 Auto-reconnect triggered (USB replug recovery)');
+
+    // Show loading indicator
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 20),
+            Text('ກຳລັງເຊື່ອມຕໍ່ໃໝ່...'),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      // Use restartConnection for proper USB reset
+      final success = await _printerService.restartConnection();
+
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+
+      if (success) {
+        _showSnack("✅ ເຊື່ອມຕໍ່ສຳເລັດ!", const Color(0xFF27AE60));
+        await _checkPrinterStatus();
+      } else {
+        // Fallback: try scanning and connecting to saved device
+        debugPrint('🔄 Restart failed, trying scan & connect...');
+        await _handleConnect();
+      }
+    } catch (e) {
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+      debugPrint('❌ Auto-reconnect error: $e');
+      _showSnack("❌ ເຊື່ອມຕໍ່ບໍ່ສຳເລັດ: $e", const Color(0xFFC0392B));
+    }
   }
 
   Future<void> _checkCurrentConnection() async {

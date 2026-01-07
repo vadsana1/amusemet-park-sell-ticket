@@ -60,92 +60,98 @@ class _HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
-    // ไม่ต้อง dispose notifier เพราะเป็น singleton
+    // 🔧 Remove listeners when widget is disposed
+    _printerService.needsReconnectNotifier.removeListener(_onReconnectNotified);
+    _printerService.needsManualReconnectNotifier
+        .removeListener(_onManualReconnectNotified);
+    _printerService.isReconnectingNotifier
+        .removeListener(_onReconnectingChanged);
     super.dispose();
   }
 
-  // 🆕 ฟังการแจ้งเตือนการเชื่อมต่อใหม่
-  void _listenToReconnectNotifier() {
-    _printerService.needsReconnectNotifier.addListener(() {
-      if (_printerService.needsReconnectNotifier.value && mounted) {
-        _showReconnectDialog();
+  // 🔧 Stored listener function for proper cleanup
+  void _onReconnectNotified() {
+    if (!mounted) return;
+
+    // Use addPostFrameCallback to safely access context after frame is rendered
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      // Only show SnackBar when auto-connected successfully
+      if (_printerService.needsReconnectNotifier.value &&
+          _printerService.isConnectedNotifier.value) {
+        _showAutoConnectedSnackBar();
+        _printerService.clearReconnectFlag();
       }
     });
   }
 
-  // 🆕 แสดง dialog เมื่อตรวจพบการเสียบ USB ใหม่
-  void _showReconnectDialog() {
+  // 🆕 ฟังการแจ้งเตือนการเชื่อมต่อใหม่
+  void _listenToReconnectNotifier() {
+    _printerService.needsReconnectNotifier.addListener(_onReconnectNotified);
+    _printerService.needsManualReconnectNotifier
+        .addListener(_onManualReconnectNotified);
+    _printerService.isReconnectingNotifier.addListener(_onReconnectingChanged);
+  }
+
+  // 🆕 Show/hide loading dialog when reconnecting
+  void _onReconnectingChanged() {
     if (!mounted) return;
 
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-        title: Row(
+    if (_printerService.isReconnectingNotifier.value) {
+      // Show loading dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 20),
+              Text('ກຳລັງເຊື່ອມຕໍ່ເຄື່ອງພິມ...'),
+            ],
+          ),
+        ),
+      );
+    } else {
+      // Hide dialog if currently showing
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+    }
+  }
+
+  // 🔧 Manual reconnect notifier handler (kept for fallback, but now mostly unused)
+  // Auto-connect now handles replug silently via needsReconnectNotifier
+  void _onManualReconnectNotified() {
+    // This is now mostly unused since auto-connect works reliably after plugin fix
+    // Kept for potential fallback scenarios
+    if (!mounted) return;
+    if (_printerService.needsManualReconnectNotifier.value) {
+      debugPrint('🔔 Manual reconnect triggered (fallback mode)');
+      _printerService.needsManualReconnectNotifier.value = false;
+    }
+  }
+
+  // Auto-connect SnackBar shown via _onReconnectNotified
+
+  // 🆕 แสดง SnackBar เมื่อ auto-connect สำเร็จ
+  void _showAutoConnectedSnackBar() {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
           children: const [
-            Icon(Icons.usb, color: Color(0xFF15A19A), size: 30),
+            Icon(Icons.print, color: Colors.white),
             SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'ຕ້ອງການເຊື່ອມຕໍ່ເຄື່ອງພິມ?',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
+            Text('✅ ເຊື່ອມຕໍ່ເຄື່ອງພິມສຳເລັດແລ້ວ'),
           ],
         ),
-        content: const Text(
-          'ກວດພົບເຄື່ອງພິມຖືກເສັຽບເຂົ້າແລ້ວ\nຕ້ອງການເຊື່ອມຕໍ່ດຽວນີ້ບໍ?',
-          style: TextStyle(fontSize: 16),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              _printerService.clearReconnectFlag();
-              Navigator.pop(context);
-            },
-            child: const Text(
-              'ຍົກເລີກ',
-              style: TextStyle(color: Colors.grey),
-            ),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF15A19A),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            onPressed: () async {
-              Navigator.pop(context);
-              _printerService.clearReconnectFlag();
-
-              // พยายามเชื่อมต่อใหม่
-              await _printerService.autoConnectOnStartup();
-
-              if (!mounted) return;
-              final isConnected = _printerService.isConnectedNotifier.value;
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    isConnected ? '✅ ເຊື່ອມຕໍ່ສຳເລັດ' : '❌ ເຊື່ອມຕໍ່ບໍ່ສຳເລັດ',
-                  ),
-                  backgroundColor: isConnected ? Colors.green : Colors.red,
-                ),
-              );
-            },
-            child: const Text(
-              'ເຊື່ອມຕໍ່',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ],
+        backgroundColor: Colors.green,
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(10),
       ),
     );
   }
