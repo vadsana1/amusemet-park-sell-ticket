@@ -57,7 +57,6 @@ class TicketCard extends StatelessWidget {
                         ticket.imageUrl!,
                         fit: BoxFit.cover, // Expand image to fill area
                         errorBuilder: (context, error, stackTrace) {
-                       
                           return Center(
                             child: Icon(
                               Icons.local_activity,
@@ -90,12 +89,13 @@ class TicketCard extends StatelessWidget {
                     ticket.ticketName,
                     style: TextStyle(
                       color: contentColor,
-                      fontSize: 18,
+                      fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
-                    maxLines: 1, // Add maxLines for visual appeal
+                    maxLines: 2, // Allow 2 lines for long names
                     overflow: TextOverflow.ellipsis,
                   ),
+                  const SizedBox(height: 4),
                   Text(
                     "ຜູ້ໃຫຍ່: ${ticket.priceAdult.toStringAsFixed(0)} ກີບ",
                     style: TextStyle(
