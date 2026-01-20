@@ -50,7 +50,7 @@ class _SingleTicketListPageState extends State<SingleTicketListPage> {
           padding: const EdgeInsets.all(16.0),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 3,
-            childAspectRatio: 2.0,
+            childAspectRatio: 1.6,
             crossAxisSpacing: 16,
             mainAxisSpacing: 16,
           ),
