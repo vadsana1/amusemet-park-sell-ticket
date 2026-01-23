@@ -74,7 +74,6 @@ class _ShiftReportPopupState extends State<ShiftReportPopup> {
       }).toList();
 
       // 4. เรียกใช้ iMin printer service
-      // 🚨 หมายเหตุ: ต้องแก้ไข ReceiptPrinterService.dart ให้รองรับพารามิเตอร์ทั้งหมดนี้
       await _iminService.printShiftReport(
         shiftId: user['staff_id']?.toString() ?? '-',
         cashierName: staffName,
@@ -84,9 +83,10 @@ class _ShiftReportPopupState extends State<ShiftReportPopup> {
         totalTickets: totalTickets,
         adultSales: adultSales,
         childSales: childSales,
-        totalVisitors: totalTickets,
-        adultVisitors: '${visitors['total_adults'] ?? 0}',
-        childVisitors: '${visitors['total_children'] ?? 0}',
+        totalVisitors:
+            totalTickets, // Keep this if needed or repurpose as total tickets
+        adultVisitors: '${sales['total_adult_tickets'] ?? 0}',
+        childVisitors: '${sales['total_child_tickets'] ?? 0}',
         payments: paymentList,
         totalPlays: '${rides['total_plays'] ?? 0}',
         adultsPlayed: '${rides['adults_played'] ?? 0}',
@@ -155,14 +155,9 @@ class _ShiftReportPopupState extends State<ShiftReportPopup> {
     // 1. ดึงข้อมูลมาแสดงบนหน้าจอ
     final Map<String, dynamic> user = widget.reportData['user'] ?? {};
     final Map<String, dynamic> sales = widget.reportData['sales'] ?? {};
-    final Map<String, dynamic> visitors =
-        widget.reportData['visitors'] ?? {}; // ดึง Visitors
     final List<dynamic> payments = widget.reportData['payments'] ?? [];
     final Map<String, dynamic> rides = widget.reportData['rides'] ?? {};
     final String closedAt = widget.reportData['closed_at'] ?? '-';
-
-    int totalVisitors = _safeParseInt(visitors['total_adults']) +
-        _safeParseInt(visitors['total_children']);
 
     return WillPopScope(
       onWillPop: () async {
@@ -217,17 +212,17 @@ class _ShiftReportPopupState extends State<ShiftReportPopup> {
                 ),
                 const Divider(height: 24),
 
-                // --- Visitors Section (ส่วนที่เพิ่มใหม่บนหน้าจอ) ---
                 _buildSectionHeader('👥 ຈຳນວນປີ້ທີ່ຂາຍ'),
-                _buildInfoRow('ລວມທັງໝົດ:', '$totalVisitors ປີ້',
+                _buildInfoRow(
+                    'ລວມທັງໝົດ:', '${sales['total_tickets'] ?? 0} ປີ້',
                     isTotal: true),
                 _buildInfoRow(
                   ' - ຜູ້ໃຫຍ່:',
-                  '${visitors['total_adults'] ?? 0} ປີ້',
+                  '${sales['total_adult_tickets'] ?? 0} ປີ້',
                 ),
                 _buildInfoRow(
                   ' - ເດັກນ້ອຍ:',
-                  '${visitors['total_children'] ?? 0} ປີ້',
+                  '${sales['total_child_tickets'] ?? 0} ປີ້',
                 ),
                 const Divider(height: 24),
 

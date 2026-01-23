@@ -311,8 +311,12 @@ class _PaymentCashViewState extends State<PaymentCashView> {
         });
       }
 
+      final userIdStr = await storage.read(key: 'user_id');
+      final int userId = int.tryParse(userIdStr ?? '') ?? 0;
+
       double totalPaid = _amountReceived + _transferAmount;
       final Map<String, dynamic> fullPayload = {
+        "user_id": userId,
         "visitor": {
           "visitor_uid": const Uuid().v4(),
           "full_name": widget.visitorFullName,
@@ -346,6 +350,7 @@ class _PaymentCashViewState extends State<PaymentCashView> {
         log('🌐 Calling API: sellDayPassSplit (single ticket)...');
         // ปรับ payload สำหรับ single-split
         final Map<String, dynamic> singlePayload = {
+          "user_id": userId,
           "visitor_uid": fullPayload["visitor"]["visitor_uid"],
           "full_name": fullPayload["visitor"]["full_name"],
           "phone": fullPayload["visitor"]["phone"],

@@ -258,7 +258,11 @@ class _PaymentSplitViewState extends State<PaymentSplitView> {
         });
       }
 
+      final userIdStr = await storage.read(key: 'user_id');
+      final int userId = int.tryParse(userIdStr ?? '') ?? 0;
+
       final Map<String, dynamic> fullPayload = {
+        "user_id": userId,
         "visitor": {
           "visitor_uid": const Uuid().v4(),
           "full_name": widget.visitorFullName,
@@ -292,6 +296,7 @@ class _PaymentSplitViewState extends State<PaymentSplitView> {
         log('🌐 Calling API: sellDayPassSplit (single ticket)...');
         // ต้องปรับ payload สำหรับ single-split
         final Map<String, dynamic> singlePayload = {
+          "user_id": userId,
           "visitor_uid": fullPayload["visitor"]["visitor_uid"],
           "full_name": fullPayload["visitor"]["full_name"],
           "phone": fullPayload["visitor"]["phone"],
