@@ -11,6 +11,7 @@ import '../models/api_ticket_response.dart';
 import './receipt_page.dart';
 
 import '../services/newticket_multiple_api.dart';
+import '../utils/url_helper.dart' show storage;
 
 class PaymentQrView extends StatefulWidget {
   final double totalPrice;
@@ -188,8 +189,13 @@ class _PaymentQrViewState extends State<PaymentQrView> {
         });
       }
 
+      // 3.5 Get User ID
+      final userIdStr = await storage.read(key: 'user_id');
+      final int userId = int.tryParse(userIdStr ?? '') ?? 0;
+
       // 4. รวมร่าง JSON Payload
       final Map<String, dynamic> fullPayload = {
+        "user_id": userId,
         "visitor": visitorData,
         "tickets": ticketsPayload,
         "payment_method": widget.paymentMethodCode,

@@ -132,10 +132,12 @@ class _ShiftSummaryScreenState extends State<ShiftSummaryScreen> {
     final double totalSales = (summary?['total_sales'] ?? 0).toDouble();
     final double adultSales = (summary?['adult_sales'] ?? 0).toDouble();
     final double childSales = (summary?['child_sales'] ?? 0).toDouble();
+
+    // Ticket Counts (New API Response)
     final int totalTickets = summary?['total_tickets'] ?? 0;
-    final int totalVisitors = totalTickets;
-    final int adultVisitors = summary?['visitors']?['adults'] ?? 0;
-    final int childVisitors = summary?['visitors']?['children'] ?? 0;
+    final int totalAdultTickets = summary?['total_adult_tickets'] ?? 0;
+    final int totalChildTickets = summary?['total_child_tickets'] ?? 0;
+
     final List<dynamic> payments = summary?['payments'] ?? [];
     final String displayDate =
         summary?['date'] ?? DateFormat('yyyy-MM-dd').format(DateTime.now());
@@ -191,20 +193,9 @@ class _ShiftSummaryScreenState extends State<ShiftSummaryScreen> {
                               children: [
                                 Expanded(
                                   flex: 1,
-                                  child: _buildSimpleStatCard(
-                                    'ຈຳນວນປີ້',
-                                    '${fmtNumber(totalTickets)}',
-                                    'ໃບ',
-                                    Icons.confirmation_number_outlined,
-                                    Colors.purple,
-                                  ),
-                                ),
-                                const SizedBox(width: 15),
-                                Expanded(
-                                  flex: 1,
-                                  child: _buildVisitorDetailedCard(
-                                    adultVisitors,
-                                    childVisitors,
+                                  child: _buildTicketDetailedCard(
+                                    totalAdultTickets,
+                                    totalChildTickets,
                                   ),
                                 ),
                               ],
@@ -681,8 +672,8 @@ class _ShiftSummaryScreenState extends State<ShiftSummaryScreen> {
     );
   }
 
-  // 3. Visitor card
-  Widget _buildVisitorDetailedCard(int adults, int children) {
+  // 3. Ticket Detailed card
+  Widget _buildTicketDetailedCard(int adults, int children) {
     int total = adults + children;
     return Container(
       height: 140,
@@ -707,7 +698,7 @@ class _ShiftSummaryScreenState extends State<ShiftSummaryScreen> {
               Row(
                 children: [
                   Icon(
-                    Icons.people_alt_outlined,
+                    Icons.confirmation_number_outlined,
                     color: Colors.blue[700],
                     size: 18,
                   ),

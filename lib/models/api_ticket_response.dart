@@ -55,7 +55,13 @@ class ApiTicketResponse {
   final List<String> paymentMethods;
 
   // 🟢 [4] รายละเอียดการชำระเงินพร้อมยอดเงิน
+  // 🟢 [4] รายละเอียดการชำระเงินพร้อมยอดเงิน
   final List<Map<String, dynamic>> paymentDetails;
+
+  // 🟢 [5] VAT & Revenue
+  final String vatRate;
+  final double vatAmount;
+  final double revenue;
 
   ApiTicketResponse({
     required this.purchaseId,
@@ -71,6 +77,9 @@ class ApiTicketResponse {
     required this.qrData,
     required this.paymentMethods,
     required this.paymentDetails,
+    required this.vatRate,
+    required this.vatAmount,
+    required this.revenue,
   });
 
   factory ApiTicketResponse.fromMap({
@@ -141,7 +150,6 @@ class ApiTicketResponse {
     int countChild = 0;
 
     try {
-
       String directTicketType =
           _safeParseString(purchaseMap['ticket_type'], 'ticket_type')
               .toLowerCase();
@@ -155,15 +163,12 @@ class ApiTicketResponse {
         }
       } else if (purchaseMap['tickets'] != null &&
           purchaseMap['tickets'] is List) {
-
         log('Counting from nested tickets array');
         for (var ticket in purchaseMap['tickets'] as List) {
           if (ticket is Map<String, dynamic>) {
-
             String ticketType =
                 _safeParseString(ticket['ticket_type'], 'ticket_type')
                     .toLowerCase();
-
 
             if (ticketType.isEmpty || ticketType == 'na') {
               ticketType =
@@ -252,20 +257,27 @@ class ApiTicketResponse {
       purchaseId: pId,
       visitorUid: vUid,
       qrCode: _safeParseString(purchaseMap['qr_code'], 'qr_code'),
-
       qrData: finalQrData,
-
       amountDue: _safeParseInt(rootMap['amount_due'], 'amount_due'),
       amountPaid: _safeParseInt(rootMap['amount_paid'], 'amount_paid'),
       changeAmount: _safeParseInt(rootMap['change_amount'], 'change_amount'),
-
       purchaseDate: transactionDate,
-
       rideNames: extractedRideNames,
       adultCount: countAdult,
       childCount: countChild,
       paymentMethods: extractedPaymentMethods,
       paymentDetails: extractedPaymentDetails,
+      vatRate: _safeParseString(rootMap['vat_rate'], 'vat_rate'),
+      vatAmount: _safeParseDouble(rootMap['vat_amount'], 'vat_amount'),
+      revenue: _safeParseDouble(rootMap['revenue'], 'revenue'),
     );
   }
+}
+
+// Helper for double parsing
+double _safeParseDouble(dynamic value, String fieldName) {
+  if (value == null) return 0.0;
+  if (value is double) return value;
+  if (value is int) return value.toDouble();
+  return double.tryParse(value.toString().replaceAll(',', '')) ?? 0.0;
 }

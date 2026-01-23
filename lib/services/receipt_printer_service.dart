@@ -249,6 +249,20 @@ class ReceiptPrinterService {
 
     await _printDivider();
 
+    // 🟢 VAT & Revenue (if available)
+    if (response.vatAmount > 0) {
+      final vatFormat = NumberFormat("#,##0.00", "en_US");
+      await _printRow(
+        'ລາຄາບໍ່ລວມ(ອມພ):',
+        '${vatFormat.format(response.revenue)} ກີບ',
+      );
+      await _printRow(
+        'ອມພ (${response.vatRate}%):',
+        '${vatFormat.format(response.vatAmount)} ກີບ',
+      );
+      await _printDivider();
+    }
+
     // --- Payment details ---
     await _printRow(
       'ລາຄາທັງໝົດ:',
@@ -297,6 +311,17 @@ class ReceiptPrinterService {
         '${currencyFormat.format(response.changeAmount)} ກີບ',
       );
     }
+
+    // --- Footer Note ---
+    await iminPrinter.printText(
+      'ໝາຍເຫດ: ກໍລະນີຊື້ປີ້ແລ້ວບໍ່ສາມາດປ່ຽນ ຫຼື ຄືນໄດ້',
+      style: IminTextStyle(
+        fontSize: 22,
+        align: IminPrintAlign.center,
+        fontStyle: IminFontStyle.bold,
+      ),
+    );
+    await iminPrinter.printAndLineFeed();
 
     // --- Footer & Cut ---
     await iminPrinter.printAndFeedPaper(120);

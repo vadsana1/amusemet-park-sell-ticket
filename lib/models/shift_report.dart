@@ -27,7 +27,6 @@ class ShiftReport {
   final ReportSales sales;
   final List<ReportPayment> payments; // Store Bank Transfer, Cash list here
   final ReportRides rides;
-  final ReportVisitors visitors;
   final String closedAt;
 
   ShiftReport({
@@ -35,7 +34,6 @@ class ShiftReport {
     required this.sales,
     required this.payments,
     required this.rides,
-    required this.visitors,
     required this.closedAt,
   });
 
@@ -51,7 +49,6 @@ class ShiftReport {
             .toList(),
 
         rides: ReportRides.fromMap(map['rides'] ?? {}),
-        visitors: ReportVisitors.fromMap(map['visitors'] ?? {}),
         closedAt: _safeParseString(map['closed_at']),
       );
     } catch (e) {
@@ -66,7 +63,6 @@ class ShiftReport {
       sales: ReportSales.empty(),
       payments: [],
       rides: ReportRides.empty(),
-      visitors: ReportVisitors.empty(),
       closedAt: '',
     );
   }
@@ -103,12 +99,16 @@ class ReportSales {
   final double adultSales;
   final double childSales;
   final int totalTickets;
+  final int totalAdultTickets;
+  final int totalChildTickets;
 
   ReportSales({
     required this.totalSales,
     required this.adultSales,
     required this.childSales,
     required this.totalTickets,
+    required this.totalAdultTickets,
+    required this.totalChildTickets,
   });
 
   factory ReportSales.fromMap(Map<String, dynamic> map) {
@@ -117,6 +117,8 @@ class ReportSales {
       adultSales: _safeParseDouble(map['adult_sales']),
       childSales: _safeParseDouble(map['child_sales']),
       totalTickets: _safeParseInt(map['total_tickets']),
+      totalAdultTickets: _safeParseInt(map['total_adult_tickets']),
+      totalChildTickets: _safeParseInt(map['total_child_tickets']),
     );
   }
 
@@ -126,6 +128,8 @@ class ReportSales {
       adultSales: 0.0,
       childSales: 0.0,
       totalTickets: 0,
+      totalAdultTickets: 0,
+      totalChildTickets: 0,
     );
   }
 }
@@ -173,34 +177,5 @@ class ReportRides {
 
   factory ReportRides.empty() {
     return ReportRides(totalPlays: 0, adultsPlayed: 0, childrenPlayed: 0);
-  }
-}
-
-class ReportVisitors {
-  final int totalAdults;
-  final int totalChildren;
-  final int totalVisitors;
-
-  ReportVisitors({
-    required this.totalAdults,
-    required this.totalChildren,
-    required this.totalVisitors,
-  });
-
-  factory ReportVisitors.fromMap(Map<String, dynamic> map) {
-    int adults = _safeParseInt(map['total_adults']);
-    int children = _safeParseInt(map['total_children']);
-
-    return ReportVisitors(
-      totalAdults: adults,
-      totalChildren: children,
-      totalVisitors: map['total_visitors'] != null
-          ? _safeParseInt(map['total_visitors'])
-          : (adults + children),
-    );
-  }
-
-  factory ReportVisitors.empty() {
-    return ReportVisitors(totalAdults: 0, totalChildren: 0, totalVisitors: 0);
   }
 }
