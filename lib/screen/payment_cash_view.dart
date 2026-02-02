@@ -234,46 +234,28 @@ class _PaymentCashViewState extends State<PaymentCashView> {
     try {
       log('🎫 Building split payment payload...');
 
-      // สร้าง tickets payload แบบจัดกลุ่ม: ticket_id เป็น array
-      Map<String, Map<String, dynamic>> ticketsGrouped = {};
-
-      for (var cartItem in widget.cart) {
-        int ticketId = cartItem.ticket.ticketId;
-
-        // จัดกลุ่มตั๋วผู้ใหญ่
-        if (cartItem.quantityAdult > 0) {
-          String key = 'adult_${widget.visitorGender}';
-          if (!ticketsGrouped.containsKey(key)) {
-            ticketsGrouped[key] = {
-              "ticket_id": <int>[],
-              "visitor_type": "adult",
-              "gender": widget.visitorGender
-            };
-          }
-          for (int i = 0; i < cartItem.quantityAdult; i++) {
-            (ticketsGrouped[key]!["ticket_id"] as List<int>).add(ticketId);
-          }
-        }
-
-        // จัดกลุ่มตั๋วเด็ก
-        if (cartItem.quantityChild > 0) {
-          String key = 'child_${widget.visitorGender}';
-          if (!ticketsGrouped.containsKey(key)) {
-            ticketsGrouped[key] = {
-              "ticket_id": <int>[],
-              "visitor_type": "child",
-              "gender": widget.visitorGender
-            };
-          }
-          for (int i = 0; i < cartItem.quantityChild; i++) {
-            (ticketsGrouped[key]!["ticket_id"] as List<int>).add(ticketId);
-          }
-        }
+      // สร้าง tickets payload: 1 คน 1 QR (รวม ticket_id ทุกเครื่องเล่นใน array เดียว)
+      List<Map<String, dynamic>> ticketsPayload = [];
+      // รวม ticket_id ทุกเครื่องเล่นใน cart
+      List<int> allTicketIds =
+          widget.cart.map((item) => item.ticket.ticketId).toList();
+      // เพิ่มผู้ใหญ่
+      for (int i = 0; i < widget.globalAdultQty; i++) {
+        ticketsPayload.add({
+          "ticket_id": allTicketIds,
+          "visitor_type": "adult",
+          "gender": widget.visitorGender
+        });
       }
-
-      List<Map<String, dynamic>> ticketsPayload =
-          ticketsGrouped.values.toList();
-      log('🎫 Tickets payload (grouped): ${json.encode(ticketsPayload)}');
+      // เพิ่มเด็ก
+      for (int i = 0; i < widget.globalChildQty; i++) {
+        ticketsPayload.add({
+          "ticket_id": allTicketIds,
+          "visitor_type": "child",
+          "gender": widget.visitorGender
+        });
+      }
+      log('🎫 Tickets payload (per person): ${json.encode(ticketsPayload)}');
 
       // สร้าง payments list
       List<Map<String, dynamic>> paymentsList = [];
@@ -339,16 +321,12 @@ class _PaymentCashViewState extends State<PaymentCashView> {
 
       Map<String, dynamic> fullResponseMap;
 
-      // ตรวจสอบว่ามีหลายตั๋วหรือไม่
       if (widget.cart.length > 1 || ticketsPayload.length > 1) {
-        // ใช้ multiple-split API สำหรับหลายตั๋ว
         log('🌐 Calling API: sellDayPassMultipleSplit (multiple tickets)...');
         fullResponseMap =
             await _visitorApiB.sellDayPassMultipleSplit(fullPayload);
       } else {
-        // ใช้ single-split API สำหรับตั๋วเดียว
         log('🌐 Calling API: sellDayPassSplit (single ticket)...');
-        // ปรับ payload สำหรับ single-split
         final Map<String, dynamic> singlePayload = {
           "user_id": userId,
           "visitor_uid": fullPayload["visitor"]["visitor_uid"],
@@ -367,7 +345,6 @@ class _PaymentCashViewState extends State<PaymentCashView> {
         fullResponseMap = await _visitorApi.sellDayPassSplit(singlePayload);
       }
 
-      // Log ข้อมูลที่ได้จาก API
       log('--- 📥 SPLIT PAYMENT RESPONSE ---');
       log('Response: ${json.encode(fullResponseMap)}');
 
@@ -399,10 +376,8 @@ class _PaymentCashViewState extends State<PaymentCashView> {
         ),
       );
 
-      // ถ้าปริ้นเสร็จแล้ว (receiptResult == true) ให้กลับไปหน้า home
       if (receiptResult == true) {
         if (mounted) {
-          // ส่ง true กลับไปให้หน้าเลือกตั๋ว clear ข้อมูลและ pop กลับ home
           Navigator.of(context).pop(true);
         }
         return;
@@ -441,7 +416,6 @@ class _PaymentCashViewState extends State<PaymentCashView> {
   }
 
   Future<void> _handleConfirmPayment() async {
-    // ຕรวจสอบยอดเงิน
     double totalPaid =
         _isTransferMode ? (_amountReceived + _transferAmount) : _amountReceived;
 
@@ -457,7 +431,6 @@ class _PaymentCashViewState extends State<PaymentCashView> {
       return;
     }
 
-    // ຖ້າອຍູ່ໃນໂໝດໂອນ ຕ້ອງກໍານເລກ Ref
     if (_isTransferMode &&
         _transferRefController.text.trim().length < _refNumberMinLength) {
       if (mounted) {
@@ -475,7 +448,6 @@ class _PaymentCashViewState extends State<PaymentCashView> {
     if (_isProcessing) return;
     setState(() => _isProcessing = true);
 
-    // ໃຊ split payment API ສຳລບທກກລະນການຊຳລະ
     await _handleSplitPayment();
   }
 
@@ -581,7 +553,6 @@ class _PaymentCashViewState extends State<PaymentCashView> {
         );
         log('--- ✅ Full API (A) Response ---: ${json.encode(responseMap)}');
 
-        // เช็คว่ามี payments array หรือไม่
         log('🔍 Checking payments in response...');
         if (responseMap['payments'] != null) {
           log('✅ Has payments array: ${json.encode(responseMap['payments'])}');
@@ -660,10 +631,8 @@ class _PaymentCashViewState extends State<PaymentCashView> {
         ),
       );
 
-      // ถ้าปริ้นเสร็จแล้ว (receiptResult == true) ให้กลับไปหน้า home
       if (receiptResult == true) {
         if (mounted) {
-          // ส่ง true กลับไปให้หน้าเลือกตั๋ว clear ข้อมูลและ pop กลับ home
           Navigator.of(context).pop(true);
         }
         return;
@@ -702,26 +671,22 @@ class _PaymentCashViewState extends State<PaymentCashView> {
 
   @override
   Widget build(BuildContext context) {
-    // ຕรวจสอบเงื่อนไขการยืนยัน
     bool canConfirm;
     if (_isTransferMode) {
-      // ໃນໂໝດໂອນ: ຕ້ອງກໍານເລກ Ref ແລະຍອດຄໍບ
       canConfirm =
           _transferRefController.text.trim().length >= _refNumberMinLength &&
               (_amountReceived + _transferAmount) >= widget.totalPrice &&
               !_isProcessing;
 
-      // Debug log - แสดงเมื่อมีการกดธนบัตร
       if (_amountReceived > 0) {
         log('💰 Transfer Mode Check: cash=$_amountReceived, transfer=$_transferAmount, total=${_amountReceived + _transferAmount}, required=${widget.totalPrice}, ref=${_transferRefController.text.length}/$_refNumberMinLength chars, canConfirm=$canConfirm');
       }
     } else {
-      // ໂໝດປກຕິ: ຕ້ອງมີເງິນຄໍບ
       canConfirm = _amountReceived >= widget.totalPrice && !_isProcessing;
     }
     return Column(
       children: [
-        const SizedBox(height: 10), // เพิ่ม margin ด้านบน
+        const SizedBox(height: 10),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text(
@@ -730,16 +695,12 @@ class _PaymentCashViewState extends State<PaymentCashView> {
           ),
         ),
         const SizedBox(height: 16),
-        // แสดงปุ่มธนบัตรและช่องข้อมูลการโอนด้านล่าง ถ้าอยู่ในโหมดโอน
         if (_isTransferMode)
           Expanded(
             child: SingleChildScrollView(
               controller: _scrollController,
-              padding: const EdgeInsets.only(
-                  left: 8,
-                  right: 8,
-                  top: 24,
-                  bottom: 16), // ລດ padding ດ້ານລ່າງເພື່ອໃຫ້ປຸ່ມົຂໍາບລົງໄດ້
+              padding:
+                  const EdgeInsets.only(left: 8, right: 8, top: 24, bottom: 16),
               child: Column(
                 children: [
                   _buildDenominationButtons(),
@@ -752,7 +713,6 @@ class _PaymentCashViewState extends State<PaymentCashView> {
               ),
             ),
           ),
-        // ในโหมดปกติ แสดงแบบเดิม
         if (!_isTransferMode)
           Expanded(
             child: SingleChildScrollView(
@@ -808,7 +768,7 @@ class _PaymentCashViewState extends State<PaymentCashView> {
                   controller: _amountController,
                   textAlign: TextAlign.right,
                   keyboardType: TextInputType.number,
-                  readOnly: true, // ບໍ່ໃຫ້ແກ້ໄຂໃນໂໝດໂອນ
+                  readOnly: true,
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -839,7 +799,7 @@ class _PaymentCashViewState extends State<PaymentCashView> {
                   controller: _transferAmountController,
                   textAlign: TextAlign.right,
                   keyboardType: TextInputType.number,
-                  readOnly: true, // ບໍ່ໃຫ້ແກ້ໄຂໃນໂໝດໂອນ
+                  readOnly: true,
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -859,7 +819,6 @@ class _PaymentCashViewState extends State<PaymentCashView> {
             ],
           ),
           const SizedBox(height: 16),
-          // เลข Ref
           TextFormField(
             controller: _transferRefController,
             keyboardType: TextInputType.number,
@@ -919,7 +878,6 @@ class _PaymentCashViewState extends State<PaymentCashView> {
         ..._denominations.map((denomination) {
           final count = _cashCounts[denomination] ?? 0;
 
-          // ถ้าอยู่ในโหมดโอน แสดงเฉพาะปุ่มที่มีจำนวน > 0
           if (_isTransferMode && count == 0) {
             return const SizedBox.shrink();
           }
@@ -1023,9 +981,7 @@ class _PaymentCashViewState extends State<PaymentCashView> {
           ),
           const SizedBox(width: 12),
         ],
-        // ปุ่มโอน
         GestureDetector(
-          // ปิดปุ่มถ้า: กำลัง process หรือ เงินสดเกิน/เท่ากับราคารวม
           onTap: (_isProcessing || _amountReceived >= widget.totalPrice)
               ? null
               : _toggleTransferMode,
@@ -1033,7 +989,6 @@ class _PaymentCashViewState extends State<PaymentCashView> {
             width: 100,
             height: 70,
             decoration: BoxDecoration(
-              // ถ้าปิดปุ่มให้เป็นสีเทา
               color: (_isProcessing || _amountReceived >= widget.totalPrice)
                   ? Colors.grey[300]
                   : (_isTransferMode ? Colors.blue[100] : Colors.blue[50]),
@@ -1078,7 +1033,6 @@ class _PaymentCashViewState extends State<PaymentCashView> {
   }
 
   Widget _buildSummaryInfo() {
-    // ถ้าอยู่ในโหมดโอน ไม่ต้องแสดงส่วนนี้เลย (ย้ายไปอยู่ใน _buildTransferSection แล้ว)
     if (_isTransferMode) {
       return const SizedBox.shrink();
     }
@@ -1126,8 +1080,6 @@ class _PaymentCashViewState extends State<PaymentCashView> {
               ),
             ],
           ),
-
-          // แสดงเงินทอนเฉพาะเมื่อไม่ได้อยู่ในโหมดโอน
           if (!_isTransferMode) ...[
             const SizedBox(height: 12),
             Row(

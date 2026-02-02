@@ -195,46 +195,28 @@ class _PaymentSplitViewState extends State<PaymentSplitView> {
     try {
       log('🎫 Building payment payload for multiple-split...');
 
-      // สร้าง tickets payload แบบจัดกลุ่ม: ticket_id เป็น array
-      Map<String, Map<String, dynamic>> ticketsGrouped = {};
-
-      for (var cartItem in widget.cart) {
-        int ticketId = cartItem.ticket.ticketId;
-
-        // จัดกลุ่มตั๋วผู้ใหญ่
-        if (cartItem.quantityAdult > 0) {
-          String key = 'adult_${widget.visitorGender}';
-          if (!ticketsGrouped.containsKey(key)) {
-            ticketsGrouped[key] = {
-              "ticket_id": <int>[],
-              "visitor_type": "adult",
-              "gender": widget.visitorGender
-            };
-          }
-          for (int i = 0; i < cartItem.quantityAdult; i++) {
-            (ticketsGrouped[key]!["ticket_id"] as List<int>).add(ticketId);
-          }
-        }
-
-        // จัดกลุ่มตั๋วเด็ก
-        if (cartItem.quantityChild > 0) {
-          String key = 'child_${widget.visitorGender}';
-          if (!ticketsGrouped.containsKey(key)) {
-            ticketsGrouped[key] = {
-              "ticket_id": <int>[],
-              "visitor_type": "child",
-              "gender": widget.visitorGender
-            };
-          }
-          for (int i = 0; i < cartItem.quantityChild; i++) {
-            (ticketsGrouped[key]!["ticket_id"] as List<int>).add(ticketId);
-          }
-        }
+      // สร้าง tickets payload: 1 คน 1 QR (รวม ticket_id ทุกเครื่องเล่นใน array เดียว)
+      List<Map<String, dynamic>> ticketsPayload = [];
+      // รวม ticket_id ทุกเครื่องเล่นใน cart
+      List<int> allTicketIds =
+          widget.cart.map((item) => item.ticket.ticketId).toList();
+      // เพิ่มผู้ใหญ่
+      for (int i = 0; i < widget.globalAdultQty; i++) {
+        ticketsPayload.add({
+          "ticket_id": allTicketIds,
+          "visitor_type": "adult",
+          "gender": widget.visitorGender
+        });
       }
-
-      List<Map<String, dynamic>> ticketsPayload =
-          ticketsGrouped.values.toList();
-      log('🎫 Tickets payload (grouped): ${json.encode(ticketsPayload)}');
+      // เพิ่มเด็ก
+      for (int i = 0; i < widget.globalChildQty; i++) {
+        ticketsPayload.add({
+          "ticket_id": allTicketIds,
+          "visitor_type": "child",
+          "gender": widget.visitorGender
+        });
+      }
+      log('🎫 Tickets payload (per person): ${json.encode(ticketsPayload)}');
 
       List<Map<String, dynamic>> paymentsList = [];
       if (_cashAmount > 0) {
@@ -280,8 +262,8 @@ class _PaymentSplitViewState extends State<PaymentSplitView> {
       };
 
       // 🔍 Log ข้อมูลที่ส่งไป API
-      log('--- 📤 SPLIT PAYMENT REQUEST ---');
-      log('Payload: ${json.encode(fullPayload)}');
+      // log('--- 📤 SPLIT PAYMENT REQUEST ---');
+      // log('Payload: ${json.encode(fullPayload)}');
 
       Map<String, dynamic> fullResponseMap;
 
@@ -314,8 +296,8 @@ class _PaymentSplitViewState extends State<PaymentSplitView> {
       }
 
       // 🔍 Log ข้อมูลที่ได้จาก API
-      log('--- 📥 SPLIT PAYMENT RESPONSE ---');
-      log('Response: ${json.encode(fullResponseMap)}');
+      // log('--- 📥 SPLIT PAYMENT RESPONSE ---');
+      // log('Response: ${json.encode(fullResponseMap)}');
 
       log('📦 Processing API response...');
       List<ApiTicketResponse> apiResponses = [];

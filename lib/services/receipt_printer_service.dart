@@ -133,9 +133,11 @@ class ReceiptPrinterService {
 
   /// Print Financial Summary Receipt
   Future<void> printFinancialReceipt(
-    ApiTicketResponse response,
+    List<ApiTicketResponse> responses,
     String sellerName,
   ) async {
+    if (responses.isEmpty) return;
+    final response = responses.first;
 // ... (code for printFinancialReceipt same as before) ...
     final DateTime now = DateTime.now();
     final String dateString = dateFormat.format(now);
@@ -249,6 +251,37 @@ class ReceiptPrinterService {
 
     await _printDivider();
 
+    // 🆕 Aggregated Item List Section
+    await iminPrinter.printText('ລາຍການ:',
+        style: IminTextStyle(
+            fontSize: 24,
+            align: IminPrintAlign.left,
+            fontStyle: IminFontStyle.bold));
+
+    // Group and sum items from all responses
+    Map<String, double> itemTotalPrices = {};
+    Map<String, int> itemTotalQuantities = {};
+
+    for (var res in responses) {
+      for (var item in res.receiptItems) {
+        itemTotalQuantities[item.name] =
+            (itemTotalQuantities[item.name] ?? 0) + item.quantity;
+        itemTotalPrices[item.name] =
+            (itemTotalPrices[item.name] ?? 0) + item.price;
+      }
+    }
+
+    for (var entry in itemTotalQuantities.entries) {
+      final name = entry.key;
+      final qty = entry.value;
+      final totalPrice = itemTotalPrices[name]!;
+
+      String label = '$qty  $name';
+      String valStr = ' | ${currencyFormat.format(totalPrice)} ກີບ';
+      await _printRow(label, valStr, isBold: false);
+    }
+    await _printDivider();
+    /* will use later
     // 🟢 VAT & Revenue (if available)
     if (response.vatAmount > 0) {
       final vatFormat = NumberFormat("#,##0.00", "en_US");
@@ -262,7 +295,7 @@ class ReceiptPrinterService {
       );
       await _printDivider();
     }
-
+    */
     // --- Payment details ---
     await _printRow(
       'ລາຄາທັງໝົດ:',

@@ -99,13 +99,15 @@ class _ReceiptPageState extends State<ReceiptPage> {
       setState(() {
         _hasPrinted = true;
       });
-      // Wait for widgets to be fully rendered
-      await Future.delayed(const Duration(milliseconds: 1000));
+      // Wait for widgets to be fully rendered (reduced from 1500ms to 800ms)
+      await Future.delayed(const Duration(milliseconds: 800));
 
-      // Trigger print (but don't close immediately)
-      _handlePrintOnly();
+      // Trigger print and WAIT for it to finish
+      log("🚀 Starting AUTO-PRINT loop...");
+      await _handlePrintOnly();
+      log("✅ AUTO-PRINT loop finished.");
 
-      // Wait configured seconds then close
+      // Wait configured seconds THEN close
       await Future.delayed(Duration(seconds: displaySeconds));
 
       if (mounted) {
@@ -127,7 +129,7 @@ class _ReceiptPageState extends State<ReceiptPage> {
       try {
         log("Printing Financial Receipt to iMin...");
         await _iminService.printFinancialReceipt(
-          widget.responses.first,
+          widget.responses,
           _sellerName,
         );
       } catch (e) {
@@ -146,14 +148,19 @@ class _ReceiptPageState extends State<ReceiptPage> {
     // Part 2: Sticker Printer (Print Ticket Images)
     // =========================================================================
     try {
-      log("Starting capture and print job for ${widget.responses.length} tickets...");
+      log("📋 Starting capture and print job for ${widget.responses.length} tickets...");
 
       for (int i = 0; i < widget.responses.length; i++) {
-        log("Capturing and printing ticket ${i + 1}/${widget.responses.length}...");
+        log("⏳ Processing ticket ${i + 1}/${widget.responses.length}...");
 
+        // 1. SMALL DELAY: Let UI settle/paint before capture
+        await Future.delayed(const Duration(milliseconds: 300));
+
+        log("📸 Capturing widget ${i + 1}...");
         final Uint8List? imageBytes = await _captureWidgetToBytes(i);
 
         if (imageBytes != null) {
+          log("🖨️ Printing ticket ${i + 1} (${imageBytes.length} bytes)...");
           await _ticketService.printImageFile(
             imageBytes,
             x: 0,
@@ -161,15 +168,16 @@ class _ReceiptPageState extends State<ReceiptPage> {
             maxWidthDots: 480,
           );
 
-          await Future.delayed(const Duration(milliseconds: 700));
+          log("✅ Ticket ${i + 1} sent. Waiting 1.5s for hardware...");
+          await Future.delayed(const Duration(milliseconds: 1500));
         } else {
-          log("Skipped printing ticket ${i + 1}: Failed to capture image.");
+          log("❌ FAILED to capture ticket ${i + 1}. Check logs.");
         }
       }
 
-      log("Sticker print job complete.");
+      log("🏁 Sticker print job complete.");
     } catch (e) {
-      log("Printing Tickets Error: $e");
+      log("🔥 Printing Tickets Error: $e");
       if (mounted) {
         ScaffoldMessenger.of(
           context,
@@ -177,7 +185,7 @@ class _ReceiptPageState extends State<ReceiptPage> {
       }
     }
 
-    log("Print job complete.");
+    log("🎉 Overall handlePrintOnly complete.");
   }
 
   Future<void> _loadSellerName() async {
@@ -201,26 +209,26 @@ class _ReceiptPageState extends State<ReceiptPage> {
   Future<Uint8List?> _captureWidgetToBytes(int index) async {
     final GlobalKey? key = _ticketKeys[index];
     if (key == null || key.currentContext == null) {
-      log('Error: Capture key or context not found for index $index.');
+      log('❌ Capture Error: Key or Context NULL for index $index.');
       return null;
     }
 
     try {
-      // Ensure the Widget is fully rendered before capturing
+      // 🚨 Force a frame before capture
       await Future.microtask(() {});
 
       final RenderRepaintBoundary boundary =
           key.currentContext!.findRenderObject() as RenderRepaintBoundary;
 
-      // 🚨 Use high pixelRatio (e.g. 3.0) for sharper image when scaled for printing
-      final ui.Image image = await boundary.toImage(pixelRatio: 3.0);
+      // 🔧 Optimized pixelRatio: 2.0 is enough for 203dpi and saves memory
+      final ui.Image image = await boundary.toImage(pixelRatio: 2.0);
       final ByteData? byteData =
           await image.toByteData(format: ui.ImageByteFormat.png);
 
       if (byteData == null) return null;
       return byteData.buffer.asUint8List();
     } catch (e) {
-      log('Error capturing widget at index $index: $e');
+      log('❌ Exception in captureWidgetToBytes ($index): $e');
       return null;
     }
   }
@@ -381,6 +389,58 @@ class _ReceiptPageState extends State<ReceiptPage> {
           ),
           const SizedBox(height: 8),
           _buildHeader(response, isFinancialReceipt: true),
+
+          // 🟢 Item list section
+          const SizedBox(height: 12),
+          const Text(
+            'ລາຍການ:',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 4),
+          ...() {
+            // Group and sum items from all responses
+            Map<String, double> itemTotalPrices = {};
+            Map<String, int> itemTotalQuantities = {};
+
+            for (var res in widget.responses) {
+              for (var item in res.receiptItems) {
+                itemTotalQuantities[item.name] =
+                    (itemTotalQuantities[item.name] ?? 0) + item.quantity;
+                itemTotalPrices[item.name] =
+                    (itemTotalPrices[item.name] ?? 0) + item.price;
+              }
+            }
+
+            return itemTotalQuantities.entries.map((entry) {
+              final name = entry.key;
+              final qty = entry.value;
+              final totalPrice = itemTotalPrices[name]!;
+
+              return Padding(
+                padding: const EdgeInsets.only(left: 8, bottom: 2),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '$qty x $name',
+                        style: const TextStyle(fontSize: 15),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Text(
+                      '${currencyFormat.format(totalPrice)} ກີບ',
+                      style: const TextStyle(fontSize: 15),
+                    ),
+                  ],
+                ),
+              );
+            }).toList();
+          }(),
 
           // 🟢 Divider line
           const SizedBox(height: 12),

@@ -160,7 +160,7 @@ class _PaymentQrViewState extends State<PaymentQrView> {
         ticketsPayload.add({
           "visitor_type": "adult",
           "gender": widget.visitorGender,
-          "ticket_id": allTicketIdsInCart,
+          "ticket_id": allTicketIdsInCart, // already a List<int>
         });
         expectedTypes.add('adult');
       }
@@ -169,7 +169,7 @@ class _PaymentQrViewState extends State<PaymentQrView> {
         ticketsPayload.add({
           "visitor_type": "child",
           "gender": widget.visitorGender,
-          "ticket_id": allTicketIdsInCart,
+          "ticket_id": allTicketIdsInCart, // already a List<int>
         });
         expectedTypes.add('child');
       }
