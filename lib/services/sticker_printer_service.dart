@@ -824,29 +824,59 @@ class StickerPrinterService {
       Uint8List finalData =
           Uint8List.fromList(printData.expand((x) => x).toList());
 
-      // Try to write, if it fails, update connection status
-      try {
-        final bool? success = await _printer.write(finalData);
-        if (success == false || success == null) {
-          debugPrint("❌ Write failed: Printer returned error or null");
-          setConnectionStatus(false);
-          throw Exception('Failed to write to printer - check USB connection');
-        }
+      // 🔄 ลองปริ้นพร้อม retry mechanism
+      bool printSuccess = false;
+      int retryCount = 0;
+      const maxRetries = 2;
 
-        // ตรวจสอบว่า connection ยังใช้ได้หรือไม่หลัง write
-        await Future.delayed(const Duration(milliseconds: 200));
-        final stillConnected = await checkConnection();
-        if (!stillConnected) {
-          debugPrint("❌ Connection lost after write");
-          throw Exception('Connection lost during print - please reconnect');
-        }
+      while (!printSuccess && retryCount < maxRetries) {
+        try {
+          debugPrint(
+              '📤 Attempting image print (attempt ${retryCount + 1}/$maxRetries)...');
 
-        debugPrint("✅ Image Print Sent Successfully");
-      } catch (writeError) {
-        debugPrint(
-            "❌ Write Error: $writeError - Connection lost, updating status");
-        setConnectionStatus(false);
-        throw Exception('Print failed: USB connection error - $writeError');
+          final bool? success = await _printer.write(finalData);
+          if (success == false || success == null) {
+            throw Exception('Printer returned error or null');
+          }
+
+          // ตรวจสอบว่า connection ยังใช้ได้หรือไม่หลัง write
+          await Future.delayed(const Duration(milliseconds: 200));
+          final stillConnected = await checkConnection();
+
+          if (!stillConnected) {
+            throw Exception('Connection lost after write');
+          }
+
+          printSuccess = true;
+          debugPrint("✅ Image Print Sent Successfully");
+        } catch (writeError) {
+          retryCount++;
+          debugPrint("❌ Image Write Error (attempt $retryCount): $writeError");
+
+          if (retryCount < maxRetries) {
+            // ลอง reconnect แล้วลองใหม่
+            debugPrint(
+                '🔄 Attempting auto-reconnect and retry (attempt ${retryCount + 1})...');
+            setConnectionStatus(false);
+
+            final reconnected = await restartConnection();
+
+            if (!reconnected) {
+              debugPrint('❌ Reconnect failed, stopping retry');
+              throw Exception(
+                  'Failed to reconnect printer - please reconnect manually');
+            }
+
+            debugPrint('✅ Reconnected successfully, retrying image print...');
+            await Future.delayed(const Duration(milliseconds: 1000));
+          } else {
+            // หมดจำนวนครั้งที่ลองได้
+            debugPrint('❌ Max retries reached, image print failed');
+            setConnectionStatus(false);
+            throw Exception(
+                'Image print failed after $maxRetries attempts - please reconnect manually');
+          }
+        }
       }
     } catch (e) {
       debugPrint("❌ Image Print Error: $e");

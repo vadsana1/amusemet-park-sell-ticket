@@ -63,6 +63,9 @@ class ApiTicketResponse {
   final double vatAmount;
   final double revenue;
 
+  // 🟢 [6] Receipt Items (Name + Price)
+  final List<ReceiptItem> receiptItems;
+
   ApiTicketResponse({
     required this.purchaseId,
     required this.visitorUid,
@@ -80,6 +83,7 @@ class ApiTicketResponse {
     required this.vatRate,
     required this.vatAmount,
     required this.revenue,
+    required this.receiptItems,
   });
 
   factory ApiTicketResponse.fromMap({
@@ -88,9 +92,9 @@ class ApiTicketResponse {
     required int globalAdultQty,
     required int globalChildQty,
   }) {
-    log('🎯 === ApiTicketResponse.fromMap STARTED ===');
-    log('📦 purchaseMap keys: ${purchaseMap.keys.toList()}');
-    log('📦 rootMap keys: ${rootMap.keys.toList()}');
+    // log('🎯 === ApiTicketResponse.fromMap STARTED ===');
+    // log('📦 purchaseMap keys: ${purchaseMap.keys.toList()}');
+    // log('📦 rootMap keys: ${rootMap.keys.toList()}');
 
     List<String> extractedRideNames = [];
 
@@ -155,7 +159,7 @@ class ApiTicketResponse {
               .toLowerCase();
 
       if (directTicketType.isNotEmpty && directTicketType != 'na') {
-        log('Found ticket_type at purchase level: $directTicketType');
+        // log('Found ticket_type at purchase level: $directTicketType');
         if (directTicketType == 'adult') {
           countAdult = 1;
         } else if (directTicketType == 'child') {
@@ -163,7 +167,7 @@ class ApiTicketResponse {
         }
       } else if (purchaseMap['tickets'] != null &&
           purchaseMap['tickets'] is List) {
-        log('Counting from nested tickets array');
+        // log('Counting from nested tickets array');
         for (var ticket in purchaseMap['tickets'] as List) {
           if (ticket is Map<String, dynamic>) {
             String ticketType =
@@ -176,7 +180,7 @@ class ApiTicketResponse {
                       .toLowerCase();
             }
 
-            log('Ticket data: ticket_type=${ticket['ticket_type']}, visitor_type=${ticket['visitor_type']}, parsed=$ticketType');
+            // log('Ticket data: ticket_type=${ticket['ticket_type']}, visitor_type=${ticket['visitor_type']}, parsed=$ticketType');
 
             if (ticketType == 'adult') {
               countAdult++;
@@ -196,22 +200,20 @@ class ApiTicketResponse {
       countChild = globalChildQty;
     }
 
-    log('Final count: Adult=$countAdult, Child=$countChild');
+    // log('Final count: Adult=$countAdult, Child=$countChild');
 
     List<String> extractedPaymentMethods = [];
     List<Map<String, dynamic>> extractedPaymentDetails = [];
     try {
-      log('🔍 Checking payments in rootMap...');
+      // log('🔍 Checking payments in rootMap...');
       if (rootMap['payments'] != null && rootMap['payments'] is List) {
-        log('✅ Found payments array with ${(rootMap['payments'] as List).length} items');
+        // log('✅ Found payments array with ${(rootMap['payments'] as List).length} items');
         for (var payment in rootMap['payments'] as List) {
           if (payment is Map<String, dynamic>) {
             String method =
                 _safeParseString(payment['payment_method'], 'payment_method');
-
             int amount = _safeParseInt(payment['amount_paid'], 'amount_paid');
-
-            log('  - Payment: method=$method, amount=$amount');
+            // log('  - Payment: method=$method, amount=$amount');
             if (method.isNotEmpty) {
               extractedPaymentMethods.add(method);
               extractedPaymentDetails.add({
@@ -226,7 +228,7 @@ class ApiTicketResponse {
       }
 
       if (extractedPaymentMethods.isEmpty) {
-        log('🔄 Using fallback - extracting from purchaseMap/rootMap...');
+        // log('🔄 Using fallback - extracting from purchaseMap/rootMap...');
         String paymentMethod = _safeParseString(
             purchaseMap['payment_method'] ?? rootMap['payment_method'],
             'payment_method');
@@ -234,24 +236,24 @@ class ApiTicketResponse {
             purchaseMap['amount_paid'] ?? rootMap['amount_paid'],
             'amount_paid');
 
-        log('  Fallback values: method=$paymentMethod, amountPaid=$amountPaid');
+        // log('  Fallback values: method=$paymentMethod, amountPaid=$amountPaid');
         if (paymentMethod.isNotEmpty) {
           extractedPaymentMethods.add(paymentMethod);
           extractedPaymentDetails.add({
             'method': paymentMethod,
             'amount': amountPaid,
           });
-          log('  ✅ Added fallback payment: $paymentMethod ($amountPaid)');
+          // log('  ✅ Added fallback payment: $paymentMethod ($amountPaid)');
         } else {
-          log('  ❌ No payment method found in fallback');
+          // log('  ❌ No payment method found in fallback');
         }
       }
     } catch (e) {
       log('❌ Error parsing payment_method: $e');
     }
 
-    log('💳 Final Payment methods: ${extractedPaymentMethods.join(", ")}');
-    log('💰 Final Payment details count: ${extractedPaymentDetails.length}');
+    // log('💳 Final Payment methods: ${extractedPaymentMethods.join(", ")}');
+    // log('💰 Final Payment details count: ${extractedPaymentDetails.length}');
 
     return ApiTicketResponse(
       purchaseId: pId,
@@ -270,8 +272,69 @@ class ApiTicketResponse {
       vatRate: _safeParseString(rootMap['vat_rate'], 'vat_rate'),
       vatAmount: _safeParseDouble(rootMap['vat_amount'], 'vat_amount'),
       revenue: _safeParseDouble(rootMap['revenue'], 'revenue'),
+      receiptItems: _parseReceiptItems(
+          purchaseMap, rootMap, extractedRideNames, countAdult, countChild),
     );
   }
+}
+
+List<ReceiptItem> _parseReceiptItems(
+  Map<String, dynamic> purchaseMap,
+  Map<String, dynamic> rootMap,
+  List<String> extractedRideNames,
+  int countAdult,
+  int countChild,
+) {
+  // 1. Try to parse from new "ticket_details" array
+  if (purchaseMap['ticket_details'] != null &&
+      purchaseMap['ticket_details'] is List) {
+    final details = purchaseMap['ticket_details'] as List;
+    if (details.isNotEmpty) {
+      return details.map((d) {
+        final map = d as Map<String, dynamic>;
+        return ReceiptItem(
+          name: _safeParseString(map['ticket_name'], 'ticket_name'),
+          price: _safeParseDouble(map['price'], 'price'),
+          quantity: 1,
+        );
+      }).toList();
+    }
+  }
+
+  // 2. Fallback: Use old logic (Total Price + Extracted Names)
+  double totalPrice =
+      _safeParseDouble(purchaseMap['total_price'], 'total_price');
+
+  if (extractedRideNames.isNotEmpty) {
+    List<ReceiptItem> items = [];
+    for (int i = 0; i < extractedRideNames.length; i++) {
+      items.add(ReceiptItem(
+        name: extractedRideNames[i],
+        price: (i == extractedRideNames.length - 1) ? totalPrice : 0.0,
+        quantity: 1,
+      ));
+    }
+    return items;
+  }
+
+  // 3. Fallback: Generic Name
+  String genericName = countAdult > 0
+      ? 'ປີ້ຜູ້ໃຫຍ່'
+      : (countChild > 0 ? 'ປີ້ເດັກນ້ອຍ' : 'ປີ້ເຂົ້າຊົມ');
+
+  return [ReceiptItem(name: genericName, price: totalPrice, quantity: 1)];
+}
+
+class ReceiptItem {
+  final String name;
+  final double price;
+  final int quantity;
+
+  ReceiptItem({
+    required this.name,
+    required this.price,
+    this.quantity = 1,
+  });
 }
 
 // Helper for double parsing
